@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { product } from '@predict/brand';
 import {
   bankName as nameOfBank,
   type AdminObligation,
@@ -31,7 +30,6 @@ import {
   type Database,
   type Executor,
 } from '@predict/db';
-import { formatNaira, formatWatDateTime } from '@predict/domain';
 import { AuditService, type Actor } from '../common/audit.service';
 import { DomainError } from '../common/domain-error';
 import { enforceLimits, HOUR } from '../common/limits';
@@ -41,7 +39,8 @@ import { isUniqueViolation } from '../common/pg-errors';
 import { DB } from '../database/database.module';
 import { LedgerService } from '../ledger/ledger.service';
 import { PaymentsService } from '../payments/payments.service';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
+import { payoutAccountChangedEmail, payoutFailedEmail } from '../email/messages';
 
 type AccountRow = typeof payoutAccounts.$inferSelect;
 type ObligationRow = typeof payoutObligations.$inferSelect;
@@ -69,7 +68,7 @@ export class ObligationsService {
     private readonly encryption: EncryptionService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly payments: PaymentsService,
     private readonly limits: RateLimitService,
   ) {}
@@ -115,7 +114,7 @@ export class ObligationsService {
 
   /**
    * Saves where winnings go. The first account counts straight away. A change waits 24 hours
-   * (and we text the player), so a stolen phone can't quietly redirect their money.
+   * (and we email the player), so someone else can't quietly redirect their money.
    */
   async saveAccount(userId: string, input: SavePayoutAccountInput): Promise<MyPayoutAccount> {
     await enforceLimits(this.limits, [
@@ -166,10 +165,10 @@ export class ObligationsService {
         activeFrom,
       });
       if (current) {
-        await this.sms.queue(
+        await this.email.queue(
           tx,
-          user.phone,
-          `${product.name}: your payout bank details were changed. The new account is used from ${formatWatDateTime(activeFrom)}. Not you? Contact ${product.supportEmail} now.`,
+          user.email,
+          payoutAccountChangedEmail({ activeFrom }),
           'payout_account_changed',
           userId,
         );
@@ -444,10 +443,10 @@ export class ObligationsService {
       if (obligation.userId) {
         const [user] = await tx.select().from(users).where(eq(users.id, obligation.userId));
         if (user) {
-          await this.sms.queue(
+          await this.email.queue(
             tx,
-            user.phone,
-            `${product.name}: we couldn't pay your ${formatNaira(obligation.amountKobo)}. Please check your bank details in the app.`,
+            user.email,
+            payoutFailedEmail({ amountKobo: obligation.amountKobo, link: this.email.link('/me') }),
             'notice',
             user.id,
           );
@@ -627,7 +626,9 @@ export class ObligationsService {
         rank: row.rank,
         reason: row.reason,
         statusNote: row.statusNote,
-        user: user ? { id: user.id, displayName: user.displayName, phone: user.phone } : null,
+        user: user
+          ? { id: user.id, displayName: user.displayName, email: user.email, phone: user.phone }
+          : null,
         account: account ? accountView(account) : null,
         sharedAccountUsers: account
           ? (shared.find((s) => s.fingerprint === account.fingerprint)?.users ?? 1)

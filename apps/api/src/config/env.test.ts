@@ -19,16 +19,15 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...BASE, DATA_ENCRYPTION_KEY: 'abc' })).toThrow(/32 bytes/);
   });
 
-  it('requires provider credentials for real SMS', () => {
-    expect(() => parseEnv({ ...BASE, SMS_PROVIDER: 'termii' })).toThrow(/TERMII_API_KEY/);
-    expect(() => parseEnv({ ...BASE, SMS_PROVIDER: 'bulksmsnigeria' })).toThrow(
-      /BULKSMSNIGERIA_API_TOKEN/,
+  it('requires provider credentials for real email', () => {
+    expect(() => parseEnv({ ...BASE, EMAIL_TRANSPORT: 'zapiack' })).toThrow(
+      /ZAPIACK_API_KEY[\s\S]*ZAPIACK_TEMPLATE_ID/,
     );
   });
 
-  it('refuses console SMS and local storage in production', () => {
+  it('refuses console email and local storage in production', () => {
     expect(() => parseEnv({ ...BASE, NODE_ENV: 'production' })).toThrow(
-      /STORAGE_DRIVER[\s\S]*SMS_PROVIDER/,
+      /STORAGE_DRIVER[\s\S]*EMAIL_TRANSPORT/,
     );
   });
 
@@ -37,8 +36,9 @@ describe('parseEnv', () => {
     const prod = parseEnv({
       ...BASE,
       NODE_ENV: 'production',
-      SMS_PROVIDER: 'termii',
-      TERMII_API_KEY: 'k',
+      EMAIL_TRANSPORT: 'zapiack',
+      ZAPIACK_API_KEY: 'k',
+      ZAPIACK_TEMPLATE_ID: 'tmpl_x',
       STORAGE_DRIVER: 'r2',
       R2_ACCOUNT_ID: 'a',
       R2_ACCESS_KEY_ID: 'b',

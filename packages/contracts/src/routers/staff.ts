@@ -8,6 +8,7 @@ import { EntryStatus, UserStatus } from '../enums';
 export const AdminPlayer = z.object({
   id: z.uuid(),
   displayName: z.string(),
+  email: z.string(),
   phone: z.string(),
   status: UserStatus,
   statusReason: z.string().nullable(),

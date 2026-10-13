@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, gte, isNull, phoneOtps, sql, type Database } from '@predict/db';
+import { and, count, desc, emailOtps, eq, gte, isNull, sql, type Database } from '@predict/db';
 import { hmac, randomOtp, safeEqual } from '../common/crypto';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
@@ -14,7 +14,7 @@ export type OtpCheck =
   | { ok: false; reason: 'expired' }
   | { ok: false; reason: 'invalid'; attemptsLeft: number };
 
-/** SMS sign-in codes, keyed by phone. Only an HMAC of each code is stored. */
+/** Email sign-in codes, keyed by address. Only an HMAC of each code is stored. */
 @Injectable()
 export class OtpService {
   constructor(
@@ -22,17 +22,17 @@ export class OtpService {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
-  /** Creates a new code, invalidating any earlier unused code for the same phone. */
-  async issue(phone: string, ipHash: string | null): Promise<string> {
+  /** Creates a new code, invalidating any earlier unused code for the same address. */
+  async issue(email: string, ipHash: string | null): Promise<string> {
     const code = randomOtp();
     await this.db.transaction(async (tx) => {
       await tx
-        .update(phoneOtps)
+        .update(emailOtps)
         .set({ consumedAt: new Date() })
-        .where(and(eq(phoneOtps.phone, phone), isNull(phoneOtps.consumedAt)));
-      await tx.insert(phoneOtps).values({
-        phone,
-        codeHash: this.hash(phone, code),
+        .where(and(eq(emailOtps.email, email), isNull(emailOtps.consumedAt)));
+      await tx.insert(emailOtps).values({
+        email,
+        codeHash: this.hash(email, code),
         expiresAt: new Date(Date.now() + OTP_TTL_SEC * 1000),
         ipHash,
       });
@@ -41,13 +41,13 @@ export class OtpService {
   }
 
   /** Checks a code; a correct code is consumed so it can't be used twice. */
-  async check(phone: string, code: string): Promise<OtpCheck> {
+  async check(email: string, code: string): Promise<OtpCheck> {
     return this.db.transaction(async (tx) => {
       const [otp] = await tx
         .select()
-        .from(phoneOtps)
-        .where(and(eq(phoneOtps.phone, phone), isNull(phoneOtps.consumedAt)))
-        .orderBy(desc(phoneOtps.createdAt))
+        .from(emailOtps)
+        .where(and(eq(emailOtps.email, email), isNull(emailOtps.consumedAt)))
+        .orderBy(desc(emailOtps.createdAt))
         .limit(1)
         .for('update');
 
@@ -55,11 +55,11 @@ export class OtpService {
         return { ok: false, reason: 'expired' } as const;
       }
 
-      if (!safeEqual(otp.codeHash, this.hash(phone, code))) {
+      if (!safeEqual(otp.codeHash, this.hash(email, code))) {
         await tx
-          .update(phoneOtps)
-          .set({ attempts: sql`${phoneOtps.attempts} + 1` })
-          .where(eq(phoneOtps.id, otp.id));
+          .update(emailOtps)
+          .set({ attempts: sql`${emailOtps.attempts} + 1` })
+          .where(eq(emailOtps.id, otp.id));
         return {
           ok: false,
           reason: 'invalid',
@@ -67,30 +67,30 @@ export class OtpService {
         } as const;
       }
 
-      await tx.update(phoneOtps).set({ consumedAt: new Date() }).where(eq(phoneOtps.id, otp.id));
+      await tx.update(emailOtps).set({ consumedAt: new Date() }).where(eq(emailOtps.id, otp.id));
       return { ok: true } as const;
     });
   }
 
-  async lastIssuedAt(phone: string): Promise<Date | null> {
+  async lastIssuedAt(email: string): Promise<Date | null> {
     const [row] = await this.db
-      .select({ createdAt: phoneOtps.createdAt })
-      .from(phoneOtps)
-      .where(eq(phoneOtps.phone, phone))
-      .orderBy(desc(phoneOtps.createdAt))
+      .select({ createdAt: emailOtps.createdAt })
+      .from(emailOtps)
+      .where(eq(emailOtps.email, email))
+      .orderBy(desc(emailOtps.createdAt))
       .limit(1);
     return row?.createdAt ?? null;
   }
 
-  async issuedSince(phone: string, since: Date): Promise<number> {
+  async issuedSince(email: string, since: Date): Promise<number> {
     const [row] = await this.db
       .select({ n: count() })
-      .from(phoneOtps)
-      .where(and(eq(phoneOtps.phone, phone), gte(phoneOtps.createdAt, since)));
+      .from(emailOtps)
+      .where(and(eq(emailOtps.email, email), gte(emailOtps.createdAt, since)));
     return row?.n ?? 0;
   }
 
-  private hash(phone: string, code: string) {
-    return hmac(this.env.AUTH_SECRET, `otp:${phone}:${code}`);
+  private hash(email: string, code: string) {
+    return hmac(this.env.AUTH_SECRET, `otp:${email}:${code}`);
   }
 }

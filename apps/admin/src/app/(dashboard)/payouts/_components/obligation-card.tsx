@@ -125,6 +125,12 @@ export function ObligationCard({ obligation }: { obligation: Obligation }) {
                 {user.displayName}
               </Link>
               <a
+                href={`mailto:${user.email}`}
+                className="text-xs break-all text-muted-foreground hover:underline"
+              >
+                {user.email}
+              </a>
+              <a
                 href={`tel:${user.phone}`}
                 className="font-mono text-xs text-muted-foreground hover:underline"
               >

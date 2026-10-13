@@ -9,45 +9,39 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
                │                                │
    predict.scoutgram.africa        predict-admin.scoutgram.africa
                │                                │
-               └──────────── Caddy (TLS) ───────┘
+               └────── Dokploy (Traefik, TLS) ──┘
                     │                       │
               web (Next.js)          admin (Next.js)
-                    └──── /api/* ──┬────────┘        (private network only)
+                    └──── /api/* ──┬────────┘        (internal network only)
                                    │
-                             api (NestJS) ── SMS provider (Termii / BulkSMS Nigeria)
+                             api (NestJS) ── email (Zapiack)
                               │      │
-                         Postgres   Redis           logos → Cloudflare R2 (public bucket)
+                         Postgres   Redis           logos → scoutgram's R2 bucket, under predict/
 ```
 
-- **The browser only ever talks to web or admin.** Both proxy `/api/*` to the API, so session cookies are first-party and the API needs no public port.
-- **Postgres holds everything that matters.** The money journal (`ledger_entries`), the audit log and prediction history are append-only, and a database trigger enforces that.
+- **The browser only ever talks to web or admin.** Both proxy `/api/*` to the API, so session cookies are first-party and the API needs no public domain.
+- **Players sign in with their email.** We email a 6-digit code; there is no password. We also collect a phone number at sign-up, unique per account but not verified.
+- **Postgres holds everything that matters.** The money journal (`ledger_entries`), the audit log, prediction history and jackpot predictions are append-only, and database triggers enforce that.
 - **Redis is optional.** It shares rate limits between API instances.
-- **A built-in timer runs every 20 seconds.** It opens and closes days at their scheduled times, closes jackpot entries and sends queued texts. Nothing about fairness depends on it: every lock is checked from timestamps when a request arrives.
+- **A built-in timer runs every 20 seconds.** It opens and closes days at their scheduled times, closes jackpot entries and sends queued emails. Nothing about fairness depends on it: every lock is checked from timestamps when a request arrives.
 
-## First-time setup (single VPS)
+## First-time setup
 
-1. **DNS:** point `predict.scoutgram.africa` and `predict-admin.scoutgram.africa` at the server (A/AAAA records).
-2. **SMS:** register a sender ID (e.g. `Scoutgram`) with your SMS provider and ask them to enable the DND/transactional route. Approval takes about 1–5 business days, so do it first.
-3. **Logos:** create a **public** Cloudflare R2 bucket and an API token with write access to it.
-4. **Configuration:** on the server, copy `.env.example` to `.env.production` and set:
-   - `NODE_ENV=production`
+1. **Email (Zapiack):** do this first, since the domain needs DNS changes.
+   - Add and verify the sending domain (DKIM, return-path and DMARC records), then create the sending address, e.g. `predict@scoutgram.africa`.
+   - Create a project API key.
+   - Create the message template **on your own machine, before deploying** (the API won't start in production without it): put `ZAPIACK_API_KEY` in `.env`, then run `pnpm build && pnpm --filter @predict/api zapiack:template`. It prints the template id and whether it's approved; check again later with `--status <id>` if it went to review.
+   - Send yourself a test with `--test-to you@example.com` once `ZAPIACK_TEMPLATE_ID` and `EMAIL_FROM` are set (locally, or later from the API's terminal in Dokploy).
+   - **Plan:** the free plan allows 100 emails a day, and every sign-in uses one. Move to a paid plan before launch.
+2. **Logos (R2):** reuse scoutgram's public R2 bucket and API token (`R2_*` values). Every file goes under `STORAGE_KEY_PREFIX` (`predict/`), so nothing collides with scoutgram's files. Logos upload straight from the admin browser, so add `https://predict-admin.scoutgram.africa` to the bucket's CORS rules (method `PUT`, header `content-type`).
+3. **Deploy on Dokploy:** follow [DEPLOY.md](DEPLOY.md). Migrations run automatically when the API starts.
    - `AUTH_SECRET` and `DATA_ENCRYPTION_KEY`: generate both fresh and keep them in a password manager. If you lose `DATA_ENCRYPTION_KEY`, the stored bank account numbers can no longer be read.
-   - `SMS_PROVIDER` plus that provider's key, and `SMS_SENDER_ID`
-   - `STORAGE_DRIVER=r2` plus the `R2_*` values
-   - `WEB_ORIGIN=https://predict.scoutgram.africa` and `ADMIN_ORIGIN=https://predict-admin.scoutgram.africa`
-   - optional: `TURNSTILE_SECRET_KEY`, with the matching `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
-   - compose values: `POSTGRES_PASSWORD`, `ACME_EMAIL` (where Let's Encrypt sends certificate notices), `WEB_HOST`, `ADMIN_HOST`
-5. **Build and start:**
-   `docker compose -f deploy/docker-compose.prod.yml --env-file .env.production up -d --build`
-6. **Migrate and seed:**
-   `docker compose -f deploy/docker-compose.prod.yml --env-file .env.production run --rm api node dist/scripts/migrate.js`
-   then the same command with `seed.js`.
-7. **First staff account:**
-   `docker compose -f deploy/docker-compose.prod.yml --env-file .env.production run --rm api node dist/scripts/create-admin.js --email you@scoutgram.africa --name "Your Name" --role super_admin`
+4. **First staff account:** in Dokploy, open the API app's terminal and run
+   `node dist/scripts/create-admin.js --email you@scoutgram.africa --name "Your Name" --role super_admin`
    The password is printed once. In production, the first sign-in asks you to set up an authenticator app.
-8. **More staff:** use roles `operations` (fixtures and results) and `finance` (payments and payouts). Keep `super_admin` for the owner.
+5. **More staff:** use roles `operations` (fixtures and results) and `finance` (payments and payouts). Keep `super_admin` for the owner.
 
-**Updating:** `git pull`, re-run step 5, then step 6 (migrations are forward-only and safe to re-run).
+**Updating:** push to the deployed branch; Dokploy rebuilds the apps whose code changed. Migrations are forward-only and run on API start.
 
 ## Before the league
 
@@ -77,7 +71,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 5. **Finalize** (super admin), on the day's **Leaderboard & finalize** tab:
    - Fix every red blocker. A pending payment claim must be confirmed or rejected.
    - Read the amber warnings and tick the box.
-   - **Finalize** freezes the pool, records each winner's prize and the jackpot's share, and texts the winners.
+   - **Finalize** freezes the pool, records each winner's prize and the jackpot's share, and emails the winners.
 6. **Payouts** (finance):
    - Winners add bank details in their account; those payouts appear under **Ready**.
    - **Start** a payout by typing the name your bank's name check shows.
@@ -99,7 +93,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 | Wrong result entered                                     | Not yet confirmed: enter it again. Already confirmed: a super admin enters the correction with a reason, then confirms.                                                          |
 | Finalized with a mistake                                 | Super admin → **Reopen** (only if no payout has started), fix it, finalize again.                                                                                                |
 | Day can't go ahead                                       | Super admin → **Cancel** with a reason. Everyone who paid is owed a full refund (shown under Payouts → refunds), and sponsor money is returned.                                  |
-| Payout bounced                                           | **Mark failed** (it goes back to Ready to retry), or **Invalid details** (the player is texted to fix their bank details).                                                       |
+| Payout bounced                                           | **Mark failed** (it goes back to Ready to retry), or **Invalid details** (the player is emailed to fix their bank details).                                                      |
 | Suspicious payout                                        | Super admin → **Hold**.                                                                                                                                                          |
 
 ## The jackpot
@@ -114,27 +108,24 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 
 ## Backups
 
-- **Nightly dump on the server:**
-  `docker compose -f deploy/docker-compose.prod.yml exec -T postgres pg_dump -U predict -Fc predict > deploy/backups/predict-$(date +%F).dump`
-  Copy the dumps off the server too (e.g. to R2 or another bucket).
-- **Restore drill:** do this before launch, then monthly.
-  `createdb` a scratch database, run `pg_restore -d <scratch> deploy/backups/<file>.dump`, and point a local API at it to check it.
+- **Nightly backups:** turn on scheduled backups for the Postgres service in Dokploy (to an S3-compatible destination such as a private R2 bucket). See [DEPLOY.md](DEPLOY.md).
+- **Restore drill:** do this before launch, then monthly. Restore a backup into a scratch database and point a local API at it to check it.
 - **Encryption key:** keep `DATA_ENCRYPTION_KEY` with the backups' recovery notes. A restore without it can't read bank account numbers.
 
 ## Security checklist
 
 - **Every staff account** has two-step sign-in (required in production) and its own login. Nobody shares accounts.
 - **Change log:** collection-account changes, payout reveals and every money action are in the **Audit log**. Review it weekly.
-- **Secrets:** stay only in `.env.production` on the server and in your password manager, never in git.
-- **Rate limits:** sign-in codes are limited per number, per IP and by a global daily cap (`SMS_DAILY_CAP`), to stop SMS-pumping bills.
+- **Secrets:** stay only in Dokploy's environment settings and your password manager, never in git.
+- **Rate limits:** sign-in codes are limited per address, per IP and by a global daily cap (`EMAIL_DAILY_CAP`), so abuse can't use up the email plan.
 - **Bank account numbers** are encrypted at rest. Players only ever see the last 4 digits.
 
 ## Troubleshooting
 
-| Symptom                                | Check                                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| "We could not send the text"           | The SMS provider balance, the sender ID's approval, and `SMS_PROVIDER` / key. The API log has the provider's error. |
-| Texts arrive late or not at all on MTN | The provider must send on the **DND/transactional** route (Termii `dnd`, BulkSMS Nigeria `otp`).                    |
-| A day won't open                       | The day page lists what's blocking it (league not started, no matches, no collection account…).                     |
-| Scheduled open didn't happen           | Audit log → `day.auto_open_failed` lists why. Fix it and open by hand.                                              |
-| API health                             | `GET /api/v1/health` on either site reports database and Redis status.                                              |
+| Symptom                       | Check                                                                                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "We could not send the email" | `EMAIL_TRANSPORT=zapiack`, the API key, that the template is APPROVED and `EMAIL_FROM` is a sending address on the verified domain. The API log has Zapiack's error; a `429` means the plan's daily or monthly volume is used up. |
+| Codes don't arrive            | Ask the player to check spam. In Zapiack, look the email up under Email → Logs; bounced addresses are suppressed automatically.                                                                                                   |
+| A day won't open              | The day page lists what's blocking it (league not started, no matches, no collection account…).                                                                                                                                   |
+| Scheduled open didn't happen  | Audit log → `day.auto_open_failed` lists why. Fix it and open by hand.                                                                                                                                                            |
+| API health                    | `GET /api/v1/health` on either site reports database and Redis status.                                                                                                                                                            |

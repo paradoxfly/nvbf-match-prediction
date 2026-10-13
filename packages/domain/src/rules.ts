@@ -525,7 +525,7 @@ function privacy(): RulesSection {
     id: 'privacy',
     title: 'Your privacy',
     paragraphs: [
-      'We never show your phone number publicly.',
+      'We never show your email address or phone number publicly.',
       'We only use your bank details to pay you.',
     ],
   };

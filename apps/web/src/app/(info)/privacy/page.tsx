@@ -14,7 +14,14 @@ export default function PrivacyPage() {
 
       <h2>What we collect</h2>
       <ul>
-        <li>Your phone number, to sign you in with a text message code.</li>
+        <li>
+          Your email address, to sign you in with an emailed code and to tell you about your entries
+          and prizes.
+        </li>
+        <li>
+          Your phone number, so we can reach you if you win. Each number can only be used by one
+          account.
+        </li>
         <li>Your display name, shown on leaderboards.</li>
         <li>Your predictions, entries and payment confirmations.</li>
         <li>
@@ -24,11 +31,11 @@ export default function PrivacyPage() {
       </ul>
 
       <h2>What we never show publicly</h2>
-      <p>Your phone number and bank details are never shown to other players.</p>
+      <p>Your email address, phone number and bank details are never shown to other players.</p>
 
       <h2>Who we share it with</h2>
       <ul>
-        <li>Our text message provider, to deliver your sign-in codes.</li>
+        <li>Our email provider (Zapiack), to deliver your sign-in codes and notifications.</li>
         <li>Our bank, to send prizes and refunds.</li>
         <li>Authorities, only where the law requires it.</li>
       </ul>

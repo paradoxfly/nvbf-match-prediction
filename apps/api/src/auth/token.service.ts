@@ -47,11 +47,11 @@ export class TokenService {
     }
   }
 
-  /** Proof that `phone` passed an OTP check, good for finishing signup only. */
-  signSignupTicket(phone: string): Promise<string> {
+  /** Proof that `email` passed a code check, good for finishing signup only. */
+  signSignupTicket(email: string): Promise<string> {
     return new SignJWT({})
       .setProtectedHeader({ alg: 'HS256' })
-      .setSubject(phone)
+      .setSubject(email)
       .setAudience(SIGNUP_AUDIENCE)
       .setIssuer(ISSUER)
       .setIssuedAt()

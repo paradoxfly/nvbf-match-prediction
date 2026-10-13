@@ -42,7 +42,7 @@ export class SettingsService {
         .set({
           collectionAccount: patch.collectionAccount,
           defaultDayConfig: patch.defaultDayConfig,
-          smsOnPaymentConfirmed: patch.smsOnPaymentConfirmed,
+          emailOnPaymentConfirmed: patch.emailOnPaymentConfirmed,
           supportContact: patch.supportContact,
           updatedByAdminId: actor.type === 'admin' ? actor.id : undefined,
         })
@@ -68,7 +68,7 @@ export class SettingsService {
     return {
       collectionAccount: row.collectionAccount ?? null,
       defaultDayConfig: row.defaultDayConfig,
-      smsOnPaymentConfirmed: row.smsOnPaymentConfirmed,
+      emailOnPaymentConfirmed: row.emailOnPaymentConfirmed,
       supportContact: row.supportContact,
     };
   }

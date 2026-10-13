@@ -69,7 +69,7 @@ function ChangeNameForm({ current, onDone }: { current: string; onDone: () => vo
   );
 }
 
-/** Who you are: display name (editable) and the phone number you sign in with. */
+/** Who you are: display name (editable), the email you sign in with and your phone number. */
 export function ProfileCard() {
   const user = useSessionUser();
   const [editing, setEditing] = useState(false);
@@ -82,9 +82,11 @@ export function ProfileCard() {
           <h1 className="text-3xl leading-none font-black tracking-[-1px] break-words">
             {user.displayName}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{formatPhone(user.phone)}</span> · only you can see your
-            number
+          <p className="flex flex-col text-sm text-muted-foreground">
+            <span className="break-all">{user.email}</span>
+            <span>
+              <span className="font-mono">{formatPhone(user.phone)}</span> · only you can see these
+            </span>
           </p>
         </div>
         {!editing ? (

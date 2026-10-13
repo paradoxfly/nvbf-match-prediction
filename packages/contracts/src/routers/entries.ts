@@ -121,7 +121,7 @@ export const PaymentQueueItem = z.object({
   createdAt: z.date(),
   confirmedAt: z.date().nullable(),
   disqualified: z.boolean(),
-  user: z.object({ id: z.uuid(), displayName: z.string(), phone: z.string() }),
+  user: z.object({ id: z.uuid(), displayName: z.string(), email: z.string(), phone: z.string() }),
   day: z.object({ id: z.uuid(), date: z.string(), status: z.string() }),
   latestClaim: ClaimView.nullable(),
   bankPaymentId: z.uuid().nullable(),
@@ -131,7 +131,7 @@ export type PaymentQueueItem = z.infer<typeof PaymentQueueItem>;
 export const PaymentQueueQuery = PageQuery.extend({
   dayId: z.uuid().optional(),
   status: EntryStatus.optional(),
-  /** Payment reference, display name, phone or sender name. */
+  /** Payment reference, display name, email, phone or sender name. */
   q: z.string().trim().max(80).optional(),
 });
 

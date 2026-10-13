@@ -40,15 +40,16 @@ const EnvSchema = z
     /** Admins must turn on two-step sign-in before using the dashboard. Defaults on in production. */
     ADMIN_MFA_REQUIRED: optional(bool),
 
-    /** `console` logs texts (development only); `termii` or `bulksmsnigeria` send real SMS. */
-    SMS_PROVIDER: z.enum(['console', 'termii', 'bulksmsnigeria']).default('console'),
-    SMS_SENDER_ID: z.string().min(3).max(11).default('Scoutgram'),
-    TERMII_API_KEY: optional(z.string()),
-    TERMII_BASE_URL: z.url().default('https://api.ng.termii.com'),
-    BULKSMSNIGERIA_API_TOKEN: optional(z.string()),
-    BULKSMSNIGERIA_BASE_URL: z.url().default('https://www.bulksmsnigeria.com/api/v2'),
-    /** Hard stop on texts per day across everyone, to cap the cost of SMS-pumping abuse. */
-    SMS_DAILY_CAP: z.coerce.number().int().min(1).default(5000),
+    /** `console` logs emails (development only); `zapiack` sends them for real. */
+    EMAIL_TRANSPORT: z.enum(['console', 'zapiack']).default('console'),
+    /** A sending address on a domain verified with the email provider. */
+    EMAIL_FROM: z.email().default('predict@scoutgram.africa'),
+    ZAPIACK_API_KEY: optional(z.string()),
+    /** The approved message template (create it with `node dist/scripts/zapiack-template.js`). */
+    ZAPIACK_TEMPLATE_ID: optional(z.string()),
+    ZAPIACK_BASE_URL: z.url().default('https://api.zapiack.com/v1'),
+    /** Hard stop on emails per day across everyone, so abuse can't burn the plan's volume. */
+    EMAIL_DAILY_CAP: z.coerce.number().int().min(1).default(5000),
 
     /** Cloudflare Turnstile on "send code"; unset skips the check (development). */
     TURNSTILE_SECRET_KEY: optional(z.string()),
@@ -70,19 +71,15 @@ const EnvSchema = z
     R2_PUBLIC_URL: optional(z.url()),
 
     SENTRY_DSN: optional(z.url()),
-    /** Seconds between background ticks (auto-open/close days, SMS outbox). 0 = off. */
+    /** Seconds between background ticks (auto-open/close days, email outbox). 0 = off. */
     TICKER_INTERVAL_SEC: z.coerce.number().int().min(0).default(20),
   })
   .superRefine((env, ctx) => {
-    if (env.SMS_PROVIDER === 'termii' && !env.TERMII_API_KEY) {
-      ctx.addIssue({ code: 'custom', path: ['TERMII_API_KEY'], message: 'Required for termii.' });
-    }
-    if (env.SMS_PROVIDER === 'bulksmsnigeria' && !env.BULKSMSNIGERIA_API_TOKEN) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['BULKSMSNIGERIA_API_TOKEN'],
-        message: 'Required for bulksmsnigeria.',
-      });
+    if (env.EMAIL_TRANSPORT === 'zapiack') {
+      for (const key of ['ZAPIACK_API_KEY', 'ZAPIACK_TEMPLATE_ID'] as const) {
+        if (!env[key])
+          ctx.addIssue({ code: 'custom', path: [key], message: 'Required for zapiack.' });
+      }
     }
     if (env.STORAGE_DRIVER === 'r2') {
       for (const key of [
@@ -103,11 +100,11 @@ const EnvSchema = z
           message: 'Production must use r2.',
         });
       }
-      if (env.SMS_PROVIDER === 'console') {
+      if (env.EMAIL_TRANSPORT === 'console') {
         ctx.addIssue({
           code: 'custom',
-          path: ['SMS_PROVIDER'],
-          message: 'Production must send real SMS (termii or bulksmsnigeria).',
+          path: ['EMAIL_TRANSPORT'],
+          message: 'Production must send real email (zapiack).',
         });
       }
     }

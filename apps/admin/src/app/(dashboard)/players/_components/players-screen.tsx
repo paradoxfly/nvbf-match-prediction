@@ -53,7 +53,7 @@ export function PlayersScreen() {
       <PageHeader
         kicker="People"
         title="players"
-        description="Everyone who signed up with their phone. Players who share a payout bank account may be duplicate accounts."
+        description="Everyone who signed up with their email. Players who share a payout bank account may be duplicate accounts."
       />
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Search" className="w-full sm:w-80">
@@ -65,7 +65,7 @@ export function PlayersScreen() {
             <Input
               type="search"
               value={search}
-              placeholder="Name or phone"
+              placeholder="Name, email or phone"
               className="pl-9"
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -133,6 +133,9 @@ export function PlayersScreen() {
                           >
                             {player.displayName}
                           </Link>
+                          <span className="block text-xs break-all text-muted-foreground">
+                            {player.email}
+                          </span>
                           <span className="block font-mono text-xs text-muted-foreground">
                             {player.phone}
                           </span>

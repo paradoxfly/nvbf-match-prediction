@@ -4,6 +4,9 @@ import { z } from 'zod';
 
 export const Email = z.email({ error: 'Enter a valid email address.' }).max(254);
 
+/** An email address as typed by a player: trimmed and lower-cased, so it keys one account. */
+export const EmailInput = z.string().trim().toLowerCase().pipe(Email);
+
 export const Password = z
   .string()
   .min(10, { error: 'Use at least 10 characters.' })

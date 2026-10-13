@@ -16,7 +16,10 @@ export default function TermsPage() {
       <h2>Who can play</h2>
       <ul>
         <li>You must be 18 or older and able to make payments in your own name.</li>
-        <li>One account per person. Your phone number is your account.</li>
+        <li>
+          One account per person. Your email address is your account, and each phone number can only
+          be used by one account.
+        </li>
         <li>
           Accounts that look like duplicates may be reviewed. If we confirm a duplicate, its entries
           can be disqualified; their entry fees stay in the prize pool.

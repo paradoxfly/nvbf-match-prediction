@@ -12,7 +12,8 @@
     "openapi": "node dist/scripts/openapi.js",
     "admin:create": "node dist/scripts/create-admin.js",
     "test:pg": "vitest run test/pg",
-    "seed:demo": "node dist/scripts/seed-demo.js"
+    "seed:demo": "node dist/scripts/seed-demo.js",
+    "zapiack:template": "node dist/scripts/zapiack-template.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1137.0",

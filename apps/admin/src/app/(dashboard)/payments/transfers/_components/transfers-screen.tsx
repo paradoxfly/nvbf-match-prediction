@@ -409,7 +409,7 @@ function RefundForm({ transfer, onDone }: { transfer: BankPayment; onDone: () =>
             <Input
               type="search"
               value={search}
-              placeholder="Search players by name or phone"
+              placeholder="Search players by name, email or phone"
               onChange={(event) => setSearch(event.target.value)}
             />
             {q.length >= 2 ? (

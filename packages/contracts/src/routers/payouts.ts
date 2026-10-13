@@ -64,7 +64,7 @@ export const payoutsContract = {
 
   /**
    * Sets where winnings go. The first account works straight away; a change takes effect after
-   * 24 hours and we text you about it, so a stolen phone can't redirect your money quietly.
+   * 24 hours and we email you about it, so someone else can't redirect your money quietly.
    */
   saveAccount: oc
     .route({ method: 'PUT', path: '/me/payout-account', tags: ['payouts'] })
@@ -107,7 +107,9 @@ export const AdminObligation = z.object({
   rank: z.number().int().nullable(),
   reason: z.string().nullable(),
   statusNote: z.string().nullable(),
-  user: z.object({ id: z.uuid(), displayName: z.string(), phone: z.string() }).nullable(),
+  user: z
+    .object({ id: z.uuid(), displayName: z.string(), email: z.string(), phone: z.string() })
+    .nullable(),
   /** The account a payout would go to now (masked). */
   account: PayoutAccountView.nullable(),
   /** Several players paid into this same bank account: a duplicate-account signal. */

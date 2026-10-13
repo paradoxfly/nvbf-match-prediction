@@ -1,48 +1,67 @@
 # syntax=docker/dockerfile:1
 #
-# Production image for the API. Build from the repo root so the workspace packages are in context:
+# API (NestJS). Build from the repo root so the workspace packages are in the context:
 #
-#   docker build -f apps/api/Dockerfile -t predict-api --build-arg APP_VERSION=$(git rev-parse --short HEAD) .
+#   docker build -f apps/api/Dockerfile -t predict-api .
 #
-# The same image runs migrations, seeds and staff accounts (see docs/RUNBOOK.md):
+# On start the container applies pending database migrations, then serves on $PORT (4000).
+# One-off commands run in the same container (e.g. from Dokploy's "Open Terminal"):
 #
-#   docker run --rm --env-file .env predict-api node dist/scripts/migrate.js
+#   node dist/scripts/create-admin.js --email you@scoutgram.africa --name "You" --role super_admin
+#   node dist/scripts/migrate.js
+#
+# See docs/DEPLOY.md.
 
-ARG NODE_VERSION=22
+ARG NODE_IMAGE=node:22.23.2-alpine3.24
 
-FROM node:${NODE_VERSION}-bookworm-slim AS base
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable
+# Node plus the pnpm version pinned in package.json ("packageManager"), through Corepack.
+FROM ${NODE_IMAGE} AS base
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    TURBO_TELEMETRY_DISABLED=1 \
+    DO_NOT_TRACK=1
 WORKDIR /repo
+COPY package.json ./
+RUN corepack enable && corepack install
+
+# Keep only the API and the workspace packages it uses, with a lockfile trimmed to match.
+FROM base AS prune
+COPY pnpm-workspace.yaml ./
+# turbo at the version in the workspace catalog.
+RUN npm install --global --no-fund --no-audit \
+      "turbo@$(sed -n 's/^ *turbo: *//p' pnpm-workspace.yaml)"
+COPY . .
+RUN turbo prune @predict/api --docker
 
 FROM base AS build
-# Download every locked package first, so this layer is reused until the lockfile changes.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --frozen-lockfile
-
-COPY . .
+# Dependencies first, so this layer is reused until a package.json or the lockfile changes.
+COPY --from=prune /repo/out/json/ ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline --filter "@predict/api..."
-# Builds the shared packages before the API (pnpm runs them in dependency order).
+    pnpm install --frozen-lockfile --store-dir=/pnpm/store
+COPY --from=prune /repo/out/full/ ./
+# Builds the shared packages, then the API (pnpm runs them in dependency order).
 RUN pnpm --filter "@predict/api..." run build
-# A standalone copy of the API at the locked versions: production dependencies only, workspace
-# packages copied in with their published files (dist, plus brand fonts and db migrations).
-# Injecting is for this step only; in development the packages stay symlinked for the watchers.
+# A self-contained copy of the API: production dependencies only, with the workspace packages
+# copied in with their published files (dist, and the db package's migrations folder).
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm --filter @predict/api deploy --prod --offline \
+    pnpm --filter @predict/api deploy --prod --offline --store-dir=/pnpm/store \
       --config.inject-workspace-packages=true /out
 
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 ARG APP_VERSION=0.0.0
 ENV NODE_ENV=production \
     PORT=4000 \
     APP_VERSION=${APP_VERSION}
 WORKDIR /app
-COPY --from=build --chown=node:node /out ./
+# Owned by root and read-only to the app user. Uploads go to R2, so nothing is written here.
+COPY --from=build /out/package.json ./package.json
+COPY --from=build /out/node_modules ./node_modules
+COPY --from=build /repo/apps/api/dist ./dist
 USER node
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/v1/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-CMD ["node", "dist/main.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 4000) + '/v1/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+# Migrations are idempotent (already-applied ones are skipped). If they fail, the container
+# exits instead of serving against an out-of-date schema.
+CMD ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/main.js"]

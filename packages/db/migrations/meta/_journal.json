@@ -29,6 +29,20 @@
       "when": 1791905363118,
       "tag": "0003_jackpot_submit_once",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791913734009,
+      "tag": "0004_drop_sms",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791913761910,
+      "tag": "0005_email_sign_in",
+      "breakpoints": true
     }
   ]
 }

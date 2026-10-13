@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { product } from '@predict/brand';
 import type {
   JackpotAdminView,
   JackpotOrders,
@@ -27,7 +26,6 @@ import {
   type Executor,
 } from '@predict/db';
 import {
-  formatNaira,
   rankJackpot,
   type Category,
   type JackpotCandidate,
@@ -44,7 +42,8 @@ import { LedgerService } from '../ledger/ledger.service';
 import { ObligationsService } from '../payouts/obligations.service';
 import { PublicService } from '../public/public.service';
 import { StandingsService } from '../setup/standings.service';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
+import { jackpotWonEmail } from '../email/messages';
 
 type JackpotRow = typeof jackpots.$inferSelect;
 type LeagueRow = typeof leagues.$inferSelect;
@@ -64,7 +63,7 @@ export class JackpotService {
     private readonly obligations: ObligationsService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly cache: TtlCache,
     private readonly limits: RateLimitService,
   ) {}
@@ -289,10 +288,14 @@ export class JackpotService {
       });
       const [user] = await tx.select().from(users).where(eq(users.id, winner.userId));
       if (user && total > 0) {
-        await this.sms.queue(
+        await this.email.queue(
           tx,
-          user.phone,
-          `${product.name}: you won the ${league.name} jackpot (${formatNaira(total)})! Add your bank details in the app to get paid.`,
+          user.email,
+          jackpotWonEmail({
+            leagueName: league.name,
+            amountKobo: total,
+            link: this.email.link('/me'),
+          }),
           'winner',
           user.id,
         );

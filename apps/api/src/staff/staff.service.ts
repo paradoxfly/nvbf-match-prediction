@@ -87,6 +87,7 @@ export class StaffService {
       search
         ? or(
             ilike(users.displayName, `%${search}%`),
+            ilike(users.email, `%${search}%`),
             phone ? eq(users.phone, phone) : ilike(users.phone, `%${search.replace(/^0/, '')}%`),
           )
         : undefined,
@@ -328,6 +329,7 @@ export class StaffService {
       return {
         id: row.id,
         displayName: row.displayName,
+        email: row.email,
         phone: row.phone,
         status: row.status,
         statusReason: row.statusReason,

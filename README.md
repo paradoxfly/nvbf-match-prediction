@@ -5,13 +5,13 @@ A paid daily volleyball prediction contest for Nigerian fans, plus a league jack
 - **Daily contest:** each match-day, players pay a small entry fee by bank transfer and predict every match: the set score (e.g. 3–1) and the points in every set. The top players win cash. On a points tie, the closest set-score predictions rank higher.
 - **Jackpot:** a share of every day's prize money builds a league jackpot. It goes to whoever predicts the final men's and women's tables most accurately.
 
-Product rules and owner decisions are in [docs/DECISIONS.md](docs/DECISIONS.md). Operations and deployment are in [docs/RUNBOOK.md](docs/RUNBOOK.md). The original brief is [daily_volleyball_prediction_contest_prd.md](daily_volleyball_prediction_contest_prd.md).
+Product rules and owner decisions are in [docs/DECISIONS.md](docs/DECISIONS.md). Day-to-day operations are in [docs/RUNBOOK.md](docs/RUNBOOK.md). Deployment (Dokploy, one Dockerfile per app under `apps/*/Dockerfile`) is in [docs/DEPLOY.md](docs/DEPLOY.md). The original brief is [daily_volleyball_prediction_contest_prd.md](daily_volleyball_prediction_contest_prd.md).
 
 ## Layout
 
 | Path                            | What                                                                                                                                 |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/api`                      | NestJS 11 API. Contract-first REST via oRPC, Drizzle on Postgres, phone OTP, SMS, payments, scoring, payouts.                        |
+| `apps/api`                      | NestJS 11 API. Contract-first REST via oRPC, Drizzle on Postgres, email sign-in codes (Zapiack), payments, scoring, payouts.         |
 | `apps/web`                      | Next.js 16 player site (mobile-first): today's contest, picks, payment, leaderboard, jackpot, standings, rules.                      |
 | `apps/admin`                    | Next.js 16 staff dashboard: teams, leagues, fixtures, payments, results, finalize, payouts, jackpot.                                 |
 | `packages/domain`               | Pure contest rules with exhaustive tests: scoring, closeness, ranking, prizes (integer kobo), locks, standings, jackpot, rules text. |
@@ -19,7 +19,6 @@ Product rules and owner decisions are in [docs/DECISIONS.md](docs/DECISIONS.md).
 | `packages/db`                   | Drizzle schema, migrations (with append-only and frozen-settings triggers) and seed.                                                 |
 | `packages/api-client`           | Typed client, TanStack Query helpers, logo upload.                                                                                   |
 | `packages/ui`, `packages/brand` | Scoutgram "Floodlight" theme, Flight-S logo and shadcn-style components.                                                             |
-| `deploy/`                       | Production compose (Postgres, Redis, API, web, admin, Caddy), Next Dockerfile, Caddyfile.                                            |
 
 ## Getting started
 
@@ -37,7 +36,7 @@ ADMIN_PASSWORD='choose-one' node apps/api/dist/scripts/create-admin.js \
 pnpm dev                        # API :4000, web :3000, admin :3001
 ```
 
-In development `SMS_PROVIDER=console`: sign-in codes are printed in the API output instead of being texted.
+In development `EMAIL_TRANSPORT=console`: nothing is emailed. Sign-in codes appear on the sign-in screen and in the API output.
 
 Want something to click through? `pnpm --filter @predict/api seed:demo` (after a build) creates a demo league: placeholder men's and women's teams, two weeks of fixtures with rest days, and today's day open. The demo collection account says "DEMO - DO NOT PAY".
 

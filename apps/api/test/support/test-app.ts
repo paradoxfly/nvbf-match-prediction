@@ -15,8 +15,8 @@ import { securityHeaders } from '../../src/common/security-headers';
 import { ENV } from '../../src/config/config.module';
 import { DB } from '../../src/database/database.module';
 import { REDIS } from '../../src/redis/redis.module';
-import { ConsoleSmsProvider } from '../../src/sms/console.provider';
-import { SMS_PROVIDER } from '../../src/sms/sms-provider';
+import { ConsoleEmailTransport } from '../../src/email/console.transport';
+import { EMAIL_TRANSPORT } from '../../src/email/email-transport';
 import { testEnv } from './env';
 
 export interface TestAppOptions {
@@ -29,7 +29,7 @@ export interface TestAppOptions {
 /**
  * The real Nest app against a real (in-process) Postgres: PGlite served over a local socket,
  * migrated with the same migrations as production. No Docker or shared database needed.
- * Texts are captured in memory and files go to a temporary local storage directory.
+ * Emails are captured in memory and files go to a temporary local storage directory.
  */
 export async function createTestApp(options: TestAppOptions = {}) {
   let databaseUrl = options.databaseUrl;
@@ -44,7 +44,7 @@ export async function createTestApp(options: TestAppOptions = {}) {
   await migrateDatabase(databaseUrl);
   const storageDir = await mkdtemp(join(tmpdir(), 'predict-test-'));
 
-  const sms = new ConsoleSmsProvider(false);
+  const emails = new ConsoleEmailTransport(false);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ENV)
     .useValue(
@@ -57,8 +57,8 @@ export async function createTestApp(options: TestAppOptions = {}) {
         ...options.env,
       }),
     )
-    .overrideProvider(SMS_PROVIDER)
-    .useValue(sms)
+    .overrideProvider(EMAIL_TRANSPORT)
+    .useValue(emails)
     .overrideProvider(REDIS)
     .useValue(null)
     .compile();
@@ -73,30 +73,32 @@ export async function createTestApp(options: TestAppOptions = {}) {
 
   const client = () => withClientHeader(request.agent(app.getHttpServer()));
 
-  /** The latest code texted to a phone (E.164). */
-  const codeFor = (phone: string): string => {
-    const message = sms.sent.filter((m) => m.to === phone && m.purpose === 'otp').at(-1);
-    const match = message ? /\b(\d{6})\b/.exec(message.body) : null;
-    if (!match) throw new Error(`No code texted to ${phone}`);
-    return match[1]!;
+  /** The latest sign-in code emailed to an address. */
+  const codeFor = (email: string): string => {
+    const message = emails.sent.filter((m) => m.to === email && m.purpose === 'otp').at(-1);
+    if (!message?.email.code) throw new Error(`No code emailed to ${email}`);
+    return message.email.code;
   };
 
   return {
     app,
     db,
-    sms,
+    emails,
     storageDir,
     /** A cookie-keeping client that sends the first-party header, like the web app. */
     client,
     raw: () => request(app.getHttpServer()),
     codeFor,
-    /** Signs a new player up through the real OTP flow; returns a signed-in client. */
-    async player(phone = '+2348031234567', displayName = 'Ada Obi') {
+    /**
+     * Signs a new player up through the real email-code flow; returns a signed-in client. The
+     * email defaults to one derived from the phone, so each test phone is its own player.
+     */
+    async player(phone = '+2348031234567', displayName = 'Ada Obi', email = emailFor(phone)) {
       const agent = client();
-      await agent.post('/v1/auth/otp/request').send({ phone }).expect(200);
+      await agent.post('/v1/auth/otp/request').send({ email }).expect(200);
       const verify = await agent
         .post('/v1/auth/otp/verify')
-        .send({ phone, code: codeFor(phone) })
+        .send({ email, code: codeFor(email) })
         .expect(200);
       if (verify.body.status === 'needs_profile') {
         await agent
@@ -104,6 +106,7 @@ export async function createTestApp(options: TestAppOptions = {}) {
           .send({
             signupTicket: verify.body.signupTicket,
             displayName,
+            phone,
             acceptTerms: true,
             confirmAdult: true,
           })
@@ -112,7 +115,7 @@ export async function createTestApp(options: TestAppOptions = {}) {
       return agent;
     },
     async reset() {
-      sms.sent.length = 0;
+      emails.sent.length = 0;
       limits.reset();
       const tables = await db.execute<{ tablename: string }>(sql`
         select tablename from pg_tables where schemaname = 'public'
@@ -131,6 +134,9 @@ export async function createTestApp(options: TestAppOptions = {}) {
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
+
+/** The test email for a test phone: +2348031234567 → p2348031234567@example.com. */
+export const emailFor = (phone: string) => `p${phone.replace(/\D/g, '')}@example.com`;
 
 type Agent = ReturnType<typeof request.agent>;
 

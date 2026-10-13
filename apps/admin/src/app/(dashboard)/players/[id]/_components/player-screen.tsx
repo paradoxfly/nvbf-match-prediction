@@ -50,7 +50,7 @@ export function PlayerScreen() {
               back={{ href: '/players', label: 'Players' }}
               kicker="Player"
               title={data.displayName}
-              description={data.phone}
+              description={`${data.email} · ${data.phone}`}
               actions={
                 <>
                   {isSuper ? (

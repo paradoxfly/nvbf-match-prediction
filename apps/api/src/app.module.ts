@@ -28,7 +28,7 @@ import { RedisModule } from './redis/redis.module';
 import { ResultsModule } from './results/results.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SetupModule } from './setup/setup.module';
-import { SmsModule } from './sms/sms.module';
+import { EmailModule } from './email/email.module';
 import { StaffModule } from './staff/staff.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -42,7 +42,7 @@ import { StorageModule } from './storage/storage.module';
     DatabaseModule,
     RedisModule,
     CommonModule,
-    SmsModule,
+    EmailModule,
     StorageModule.register(),
     HealthModule,
     AuthModule,

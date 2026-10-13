@@ -123,7 +123,7 @@ function PaymentsQueue() {
             <Input
               type="search"
               value={search}
-              placeholder="Reference, player name, phone or sender"
+              placeholder="Reference, player, email, phone or sender"
               className="pl-9"
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -189,6 +189,9 @@ function PaymentsQueue() {
                         </TableCell>
                         <TableCell className={STACK}>
                           <span className="block font-semibold">{item.user.displayName}</span>
+                          <span className="block text-xs break-all text-muted-foreground">
+                            {item.user.email}
+                          </span>
                           <span className="font-mono text-xs text-muted-foreground">
                             {item.user.phone}
                           </span>

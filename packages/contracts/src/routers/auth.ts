@@ -1,10 +1,12 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
-import { DisplayName, Ok, OtpCode, PhoneInput, RATE_LIMITED } from '../common';
+import { DisplayName, EmailInput, Ok, OtpCode, PhoneInput, RATE_LIMITED } from '../common';
 
 export const SessionUser = z.object({
   id: z.uuid(),
-  /** E.164, e.g. +2348031234567. Only ever shown to its owner. */
+  /** The verified sign-in address. Only ever shown to its owner. */
+  email: z.string(),
+  /** E.164, e.g. +2348031234567. Unique per account but not verified. Only shown to its owner. */
   phone: z.string(),
   displayName: z.string(),
 });
@@ -14,26 +16,26 @@ export const AuthSession = z.object({ user: SessionUser });
 export type AuthSession = z.infer<typeof AuthSession>;
 
 export const RequestOtpInput = z.object({
-  phone: PhoneInput,
+  email: EmailInput,
   /** Cloudflare Turnstile token, required when the API has a Turnstile secret configured. */
   captchaToken: z.string().max(4096).optional(),
 });
 export type RequestOtpInput = z.infer<typeof RequestOtpInput>;
 
 export const RequestOtpResult = z.object({
-  /** The number the code was sent to, normalised to E.164. */
-  phone: z.string(),
+  /** The address the code was sent to, normalised. */
+  email: z.string(),
   expiresInSec: z.number().int(),
   resendAfterSec: z.number().int(),
   /**
-   * Local development only (console SMS provider, not production): the code itself, so it can
-   * be shown on screen instead of being read from the API log. Never set in production.
+   * Local development only (console email transport, not production): the code itself, so it
+   * can be shown on screen instead of being read from the API log. Never set in production.
    */
   devCode: z.string().optional(),
 });
 export type RequestOtpResult = z.infer<typeof RequestOtpResult>;
 
-export const VerifyOtpInput = z.object({ phone: PhoneInput, code: OtpCode });
+export const VerifyOtpInput = z.object({ email: EmailInput, code: OtpCode });
 export type VerifyOtpInput = z.infer<typeof VerifyOtpInput>;
 
 /**
@@ -44,7 +46,7 @@ export const VerifyOtpResult = z.discriminatedUnion('status', [
   z.object({ status: z.literal('signed_in'), user: SessionUser }),
   z.object({
     status: z.literal('needs_profile'),
-    phone: z.string(),
+    email: z.string(),
     signupTicket: z.string(),
     expiresInSec: z.number().int(),
   }),
@@ -54,6 +56,8 @@ export type VerifyOtpResult = z.infer<typeof VerifyOtpResult>;
 export const CompleteSignupInput = z.object({
   signupTicket: z.string().min(1).max(2048),
   displayName: DisplayName,
+  /** Collected so we can reach winners; must be unique across accounts, but isn't verified. */
+  phone: PhoneInput,
   acceptTerms: z.literal(true, { error: 'Please accept the rules and terms.' }),
   confirmAdult: z.literal(true, { error: 'You must be 18 or older to play.' }),
 });
@@ -85,13 +89,12 @@ const tags = ['auth'];
 
 export const authContract = {
   requestOtp: oc
-    .route({ method: 'POST', path: '/auth/otp/request', tags, summary: 'Text a sign-in code' })
+    .route({ method: 'POST', path: '/auth/otp/request', tags, summary: 'Email a sign-in code' })
     .errors({
-      INVALID_PHONE: { status: 400, message: 'Enter a valid Nigerian mobile number.' },
       CAPTCHA_FAILED: { status: 400, message: 'Please confirm you are not a robot.' },
-      SMS_FAILED: {
+      EMAIL_FAILED: {
         status: 503,
-        message: 'We could not send the text right now. Try again in a minute.',
+        message: 'We could not send the email right now. Try again in a minute.',
       },
       RATE_LIMITED,
     })
@@ -100,7 +103,7 @@ export const authContract = {
 
   verifyOtp: oc
     .route({ method: 'POST', path: '/auth/otp/verify', tags, summary: 'Check a sign-in code' })
-    .errors({ ...CODE_ERRORS, INVALID_PHONE: { status: 400, message: 'Invalid phone number.' } })
+    .errors(CODE_ERRORS)
     .input(VerifyOtpInput)
     .output(VerifyOtpResult),
 
@@ -108,6 +111,11 @@ export const authContract = {
     .route({ method: 'POST', path: '/auth/signup/complete', tags, summary: 'Create the account' })
     .errors({
       TICKET_EXPIRED: { status: 400, message: 'That took too long. Request a new code.' },
+      INVALID_PHONE: { status: 400, message: 'Enter a valid Nigerian mobile number.' },
+      PHONE_TAKEN: {
+        status: 409,
+        message: 'That phone number is already linked to another account.',
+      },
       DISPLAY_NAME_TAKEN,
       RATE_LIMITED,
     })

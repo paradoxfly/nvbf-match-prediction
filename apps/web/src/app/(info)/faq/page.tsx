@@ -22,8 +22,9 @@ const QUESTIONS: Question[] = [
     answer: (
       <>
         <p>
-          Sign in with your phone number. We text you a code, so there&apos;s no password to
-          remember.
+          Sign in with your email address. We email you a code, so there&apos;s no password to
+          remember. The first time, we also ask for your phone number so we can reach you if you
+          win.
         </p>
         <p>
           Open today&apos;s matches under <Link href="/play">Play</Link>, pick every match and tap
@@ -156,7 +157,7 @@ const QUESTIONS: Question[] = [
         </p>
         <p>
           Add your bank details under <Link href="/me">Me</Link>. You can follow each payment there
-          too. A change of bank details takes effect after 24 hours, and we text you about it.
+          too. A change of bank details takes effect after 24 hours, and we email you about it.
         </p>
       </>
     ),
@@ -193,8 +194,8 @@ const QUESTIONS: Question[] = [
     question: 'Will you ever ask for my PIN or code?',
     answer: (
       <p>
-        Never. We will never ask for your bank PIN, password or the sign-in code we text you. Anyone
-        who asks is not us.
+        Never. We will never ask for your bank PIN, password or the sign-in code we email you.
+        Anyone who asks is not us.
       </p>
     ),
   },

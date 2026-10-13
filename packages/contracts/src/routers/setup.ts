@@ -373,7 +373,7 @@ export const adminDaysContract = {
 export const SettingsView = z.object({
   collectionAccount: CollectionAccount.nullable(),
   defaultDayConfig: DayConfig,
-  smsOnPaymentConfirmed: z.boolean(),
+  emailOnPaymentConfirmed: z.boolean(),
   supportContact: z.string().nullable(),
 });
 export type SettingsView = z.infer<typeof SettingsView>;
@@ -389,7 +389,7 @@ export const adminSettingsContract = {
       z.object({
         collectionAccount: CollectionAccount.nullable().optional(),
         defaultDayConfig: DayConfig.optional(),
-        smsOnPaymentConfirmed: z.boolean().optional(),
+        emailOnPaymentConfirmed: z.boolean().optional(),
         supportContact: z.string().trim().max(200).nullable().optional(),
       }),
     )

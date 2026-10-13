@@ -14,11 +14,11 @@ import { TtlCache } from '../contest/ttl-cache';
 import { DB } from '../database/database.module';
 import { ObligationsService } from '../payouts/obligations.service';
 import { DaysService } from '../setup/days.service';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
 
 /**
  * Background housekeeping on a timer: scheduled openings and closings, jackpot entry deadlines
- * and the SMS outbox. Every step is an idempotent conditional update, so running it on several
+ * and the email outbox. Every step is an idempotent conditional update, so running it on several
  * instances (or twice) is harmless. Nothing about fairness depends on it: locks and cutoffs are
  * always computed from timestamps when a request arrives.
  */
@@ -33,7 +33,7 @@ export class SchedulerService implements OnApplicationBootstrap, OnModuleDestroy
     @Inject(DB) private readonly db: Database,
     private readonly days: DaysService,
     private readonly obligations: ObligationsService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly audit: AuditService,
     private readonly cache: TtlCache,
   ) {}
@@ -57,7 +57,7 @@ export class SchedulerService implements OnApplicationBootstrap, OnModuleDestroy
       await this.closeJackpots();
       // Bank details changed 24 hours ago are now in force: payouts waiting on them can go.
       await this.obligations.promoteReady(this.db);
-      await this.sms.processOutbox();
+      await this.email.processOutbox();
     } catch (error) {
       this.logger.error(`Tick failed: ${(error as Error).message}`);
     } finally {

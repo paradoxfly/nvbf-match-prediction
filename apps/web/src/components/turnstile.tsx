@@ -41,12 +41,12 @@ function loadScript(): Promise<void> {
   return scriptLoading;
 }
 
-/** True when this deployment protects "text me a code" with Cloudflare Turnstile. */
+/** True when this deployment protects "email me a code" with Cloudflare Turnstile. */
 export const turnstileEnabled = Boolean(SITE_KEY);
 
 /**
- * Cloudflare's bot check for the "text me a code" form (texts cost money, so bots shouldn't
- * trigger them). Renders nothing when no site key is configured.
+ * Cloudflare's bot check for the "email me a code" form (every email uses our sending quota,
+ * so bots shouldn't trigger them). Renders nothing when no site key is configured.
  */
 export function Turnstile({
   onToken,

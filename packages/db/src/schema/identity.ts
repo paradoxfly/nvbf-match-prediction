@@ -3,10 +3,12 @@ import { check, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core'
 import { citext, id, timestamps, tstz } from './_shared';
 import { adminRole, adminStatus, userStatus } from './enums';
 
-/** A player. The verified phone number is the account identifier; there is no password. */
+/** A player. The verified email address is the account identifier; there is no password. */
 export const users = pgTable('users', {
   id: id(),
-  /** E.164, e.g. +2348031234567. Never shown publicly. */
+  /** Verified by a sign-in code. Never shown publicly. */
+  email: citext().notNull().unique(),
+  /** E.164, e.g. +2348031234567. Unique per account but not verified. Never shown publicly. */
   phone: text().notNull().unique(),
   displayName: citext().notNull().unique(),
   status: userStatus().notNull().default('active'),
@@ -64,14 +66,14 @@ export const sessions = pgTable(
 );
 
 /**
- * SMS sign-in codes, keyed by phone (the account may not exist yet). Only an HMAC of the code is
- * stored; a code dies after expiry, use, or 5 wrong tries.
+ * Email sign-in codes, keyed by address (the account may not exist yet). Only an HMAC of the code
+ * is stored; a code dies after expiry, use, or 5 wrong tries.
  */
-export const phoneOtps = pgTable(
-  'phone_otps',
+export const emailOtps = pgTable(
+  'email_otps',
   {
     id: id(),
-    phone: text().notNull(),
+    email: citext().notNull(),
     codeHash: text().notNull(),
     expiresAt: tstz().notNull(),
     attempts: integer().notNull().default(0),
@@ -79,5 +81,5 @@ export const phoneOtps = pgTable(
     ipHash: text(),
     createdAt: tstz().notNull().defaultNow(),
   },
-  (t) => [index().on(t.phone, t.createdAt)],
+  (t) => [index().on(t.email, t.createdAt)],
 );

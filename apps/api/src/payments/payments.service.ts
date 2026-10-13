@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { product } from '@predict/brand';
 import type { BankPaymentView, BankTransferInput, PaymentQueueItem } from '@predict/contracts';
 import {
   and,
@@ -33,7 +32,8 @@ import { DB } from '../database/database.module';
 import { claimView, type EntryRow } from '../entries/entries.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { SettingsService } from '../setup/settings.service';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
+import { paymentConfirmedEmail } from '../email/messages';
 
 type BankPaymentRow = typeof bankPayments.$inferSelect;
 
@@ -55,7 +55,7 @@ export class PaymentsService {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly cache: TtlCache,
   ) {}
 
@@ -75,6 +75,7 @@ export class PaymentsService {
         ? or(
             eq(entries.paymentReference, reference ?? search),
             ilike(users.displayName, `%${search}%`),
+            ilike(users.email, `%${search}%`),
             ilike(users.phone, `%${search.replace(/^0/, '')}%`),
             sql`exists (select 1 from ${paymentClaims} pc where pc.entry_id = ${entries.id} and pc.sender_name ilike ${`%${search}%`})`,
           )
@@ -179,14 +180,18 @@ export class PaymentsService {
       });
 
       const settings = await this.settings.row(tx);
-      if (settings.smsOnPaymentConfirmed) {
+      if (settings.emailOnPaymentConfirmed) {
         const [user] = await tx.select().from(users).where(eq(users.id, entry.userId));
         if (user) {
-          await this.sms.queue(
+          await this.email.queue(
             tx,
-            user.phone,
-            `${product.name}: your ${formatNaira(entry.feeKobo)} entry for ${day.date} is confirmed. Good luck!`,
-            'notice',
+            user.email,
+            paymentConfirmedEmail({
+              date: day.date,
+              feeKobo: entry.feeKobo,
+              link: this.email.link(`/play/${day.date}`),
+            }),
+            'payment_confirmed',
             user.id,
           );
         }
@@ -488,7 +493,7 @@ export class PaymentsService {
         createdAt: row.createdAt,
         confirmedAt: row.confirmedAt,
         disqualified: row.disqualifiedAt !== null,
-        user: { id: user.id, displayName: user.displayName, phone: user.phone },
+        user: { id: user.id, displayName: user.displayName, email: user.email, phone: user.phone },
         day: { id: day.id, date: day.date, status: day.status },
         latestClaim: claim ? claimView(claim) : null,
         bankPaymentId: row.bankPaymentId,

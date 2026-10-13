@@ -116,11 +116,17 @@ export type MediaKind = z.infer<typeof MediaKind>;
 export const MediaStatus = z.enum(['pending', 'ready', 'rejected', 'deleted']);
 export type MediaStatus = z.infer<typeof MediaStatus>;
 
-export const SmsPurpose = z.enum(['otp', 'winner', 'payout_account_changed', 'notice']);
-export type SmsPurpose = z.infer<typeof SmsPurpose>;
+export const EmailPurpose = z.enum([
+  'otp',
+  'winner',
+  'payout_account_changed',
+  'payment_confirmed',
+  'notice',
+]);
+export type EmailPurpose = z.infer<typeof EmailPurpose>;
 
-export const SmsStatus = z.enum(['queued', 'sent', 'failed']);
-export type SmsStatus = z.infer<typeof SmsStatus>;
+export const EmailStatus = z.enum(['queued', 'sent', 'failed']);
+export type EmailStatus = z.infer<typeof EmailStatus>;
 
 export const TieBreaker = z.enum(['closeness', 'exactScores', 'correctWinners']);
 export type TieBreaker = z.infer<typeof TieBreaker>;

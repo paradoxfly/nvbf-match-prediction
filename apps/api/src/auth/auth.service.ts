@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { product } from '@predict/brand';
 import {
   TERMS_VERSION,
   type CompleteSignupInput,
@@ -19,7 +18,8 @@ import { verifyTurnstile } from '../common/turnstile';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { DB } from '../database/database.module';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
+import { signInCodeEmail } from '../email/messages';
 import { OTP_RESEND_COOLDOWN_SEC, OTP_TTL_SEC, OtpService, type OtpCheck } from './otp.service';
 import { SessionService, type ClientMeta, type StartedSession } from './session.service';
 import { SIGNUP_TICKET_TTL_SEC, TokenService } from './token.service';
@@ -31,11 +31,11 @@ export interface SignedIn {
 
 export type VerifyOutcome =
   | ({ status: 'signed_in' } & SignedIn)
-  | { status: 'needs_profile'; phone: string; signupTicket: string; expiresInSec: number };
+  | { status: 'needs_profile'; email: string; signupTicket: string; expiresInSec: number };
 
-/** Per-phone caps on codes sent, counted from the database so they survive restarts. */
-const PHONE_HOURLY_CODES = 5;
-const PHONE_DAILY_CODES = 10;
+/** Per-address caps on codes sent, counted from the database so they survive restarts. */
+const EMAIL_HOURLY_CODES = 5;
+const EMAIL_DAILY_CODES = 10;
 
 @Injectable()
 export class AuthService {
@@ -45,16 +45,16 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly tokens: TokenService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly limits: RateLimitService,
   ) {}
 
   /**
-   * Texts a sign-in code. The response is the same whether or not the number has an account,
+   * Emails a sign-in code. The response is the same whether or not the address has an account,
    * so this can't be used to discover who plays.
    */
   async requestOtp(input: RequestOtpInput, meta: ClientMeta): Promise<RequestOtpResult> {
-    const phone = this.normalize(input.phone);
+    const email = input.email;
     await enforceLimits(this.limits, [
       { key: `otp:ip:${meta.ip}`, limit: 20, windowSec: HOUR },
       { key: `otp:ip-day:${meta.ip}`, limit: 60, windowSec: DAY },
@@ -64,33 +64,29 @@ export class AuthService {
     }
 
     const now = Date.now();
-    const last = await this.otp.lastIssuedAt(phone);
+    const last = await this.otp.lastIssuedAt(email);
     if (last && now - last.getTime() < OTP_RESEND_COOLDOWN_SEC * 1000) {
       throw new DomainError('RATE_LIMITED', {
         retryAfterSec: Math.ceil((last.getTime() + OTP_RESEND_COOLDOWN_SEC * 1000 - now) / 1000),
       });
     }
-    if ((await this.otp.issuedSince(phone, new Date(now - HOUR * 1000))) >= PHONE_HOURLY_CODES) {
+    if ((await this.otp.issuedSince(email, new Date(now - HOUR * 1000))) >= EMAIL_HOURLY_CODES) {
       throw new DomainError('RATE_LIMITED', { retryAfterSec: 15 * MINUTE });
     }
-    if ((await this.otp.issuedSince(phone, new Date(now - DAY * 1000))) >= PHONE_DAILY_CODES) {
+    if ((await this.otp.issuedSince(email, new Date(now - DAY * 1000))) >= EMAIL_DAILY_CODES) {
       throw new DomainError('RATE_LIMITED', { retryAfterSec: 6 * HOUR });
     }
 
     const ipHash = hmac(this.env.AUTH_SECRET, meta.ip);
-    const code = await this.otp.issue(phone, ipHash);
-    const minutes = Math.round(OTP_TTL_SEC / 60);
-    await this.sms.sendNow(
-      phone,
-      `${code} is your ${product.name} code. It expires in ${minutes} minutes. Never share it with anyone.`,
-      'otp',
-      { ipHash, storeBody: false },
-    );
-    // Nothing is texted locally, so hand the code back for the sign-in screen to show. The API
-    // refuses to start in production with the console provider; the NODE_ENV check is a backstop.
-    const showCode = this.env.SMS_PROVIDER === 'console' && this.env.NODE_ENV !== 'production';
+    const code = await this.otp.issue(email, ipHash);
+    await this.email.sendNow(email, signInCodeEmail(code, Math.round(OTP_TTL_SEC / 60)), 'otp', {
+      ipHash,
+    });
+    // Nothing is emailed locally, so hand the code back for the sign-in screen to show. The API
+    // refuses to start in production with the console transport; NODE_ENV is a backstop.
+    const showCode = this.env.EMAIL_TRANSPORT === 'console' && this.env.NODE_ENV !== 'production';
     return {
-      phone,
+      email,
       expiresInSec: OTP_TTL_SEC,
       resendAfterSec: OTP_RESEND_COOLDOWN_SEC,
       ...(showCode ? { devCode: code } : {}),
@@ -98,13 +94,13 @@ export class AuthService {
   }
 
   async verifyOtp(input: VerifyOtpInput, meta: ClientMeta): Promise<VerifyOutcome> {
-    const phone = this.normalize(input.phone);
+    const email = input.email;
     await enforceLimits(this.limits, [
       { key: `verify:ip:${meta.ip}`, limit: 30, windowSec: 15 * MINUTE },
     ]);
-    this.assertCode(await this.otp.check(phone, input.code));
+    this.assertCode(await this.otp.check(email, input.code));
 
-    const [user] = await this.db.select().from(users).where(eq(users.phone, phone));
+    const [user] = await this.db.select().from(users).where(eq(users.email, email));
     if (user) {
       if (user.status !== 'active') throw new DomainError('ACCOUNT_SUSPENDED');
       await this.db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
@@ -113,23 +109,29 @@ export class AuthService {
 
     return {
       status: 'needs_profile',
-      phone,
-      signupTicket: await this.tokens.signSignupTicket(phone),
+      email,
+      signupTicket: await this.tokens.signSignupTicket(email),
       expiresInSec: SIGNUP_TICKET_TTL_SEC,
     };
   }
 
-  /** Creates the account for a phone that just passed an OTP check (the ticket proves it). */
+  /**
+   * Creates the account for an address that just passed a code check (the ticket proves it).
+   * The phone number isn't verified, only checked to be a Nigerian mobile no other account uses.
+   */
   async completeSignup(input: CompleteSignupInput, meta: ClientMeta): Promise<SignedIn> {
     await enforceLimits(this.limits, [{ key: `signup:ip:${meta.ip}`, limit: 10, windowSec: HOUR }]);
-    const phone = await this.tokens.verifySignupTicket(input.signupTicket);
-    if (!phone) throw new DomainError('TICKET_EXPIRED');
+    const email = await this.tokens.verifySignupTicket(input.signupTicket);
+    if (!email) throw new DomainError('TICKET_EXPIRED');
+    const phone = normalizeNigerianPhone(input.phone);
+    if (!phone) throw new DomainError('INVALID_PHONE');
 
     const now = new Date();
     try {
       const [created] = await this.db
         .insert(users)
         .values({
+          email,
           phone,
           displayName: input.displayName,
           termsVersion: TERMS_VERSION,
@@ -141,9 +143,12 @@ export class AuthService {
       return this.signIn(created!.id, meta);
     } catch (error) {
       if (isUniqueViolation(error, 'displayName')) throw new DomainError('DISPLAY_NAME_TAKEN');
-      if (!isUniqueViolation(error, 'phone')) throw error;
+      if (!isUniqueViolation(error, 'email')) {
+        if (isUniqueViolation(error, 'phone')) throw new DomainError('PHONE_TAKEN');
+        throw error;
+      }
       // Double submit: the account now exists, so just sign in.
-      const [existing] = await this.db.select().from(users).where(eq(users.phone, phone));
+      const [existing] = await this.db.select().from(users).where(eq(users.email, email));
       if (!existing || existing.status !== 'active') throw new DomainError('TICKET_EXPIRED');
       return this.signIn(existing.id, meta);
     }
@@ -185,7 +190,12 @@ export class AuthService {
 
   async sessionUser(userId: string): Promise<SessionUser> {
     const [row] = await this.db
-      .select({ id: users.id, phone: users.phone, displayName: users.displayName })
+      .select({
+        id: users.id,
+        email: users.email,
+        phone: users.phone,
+        displayName: users.displayName,
+      })
       .from(users)
       .where(eq(users.id, userId));
     if (!row) throw new Error(`User ${userId} not found`);
@@ -195,12 +205,6 @@ export class AuthService {
   private async signIn(userId: string, meta: ClientMeta): Promise<SignedIn> {
     const session = await this.sessions.start('user', userId, meta);
     return { session, user: await this.sessionUser(userId) };
-  }
-
-  private normalize(raw: string): string {
-    const phone = normalizeNigerianPhone(raw);
-    if (!phone) throw new DomainError('INVALID_PHONE');
-    return phone;
   }
 
   private assertCode(result: OtpCheck) {

@@ -1,23 +1,38 @@
-# Images build from source: never send local installs, builds or secrets to the daemon.
+# Images build from source (apps/*/Dockerfile, context = repo root). Keep local installs, build
+# output, secrets and anything the builds don't read out of the context.
+
+# Installs and build output
 **/node_modules
 **/dist
 **/.next
 **/out
-**/coverage
 **/.turbo
 **/*.tsbuildinfo
 **/next-env.d.ts
 
-.env
-.env.*
-!.env.example
+# Secrets. Dokploy's "Create Environment File" option writes a .env next to the Dockerfile;
+# it must never end up in an image.
+**/.env
+**/.env.*
+!**/.env.example
 
-**/.dev-mail
+# Local data and test output
 **/.storage
+**/.dev-mail
+**/coverage
+**/test-results
+**/playwright-report
 **/*.log
 **/.DS_Store
 
+# Repo and editor metadata, docs, and the build files themselves
 .git
 .github
 .vscode
+.idea
 .claude
+docs
+/*.md
+docker-compose.yml
+**/Dockerfile
+.dockerignore

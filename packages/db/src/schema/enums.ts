@@ -6,6 +6,8 @@ import {
   ContributionSource,
   ContributionStatus,
   DayStatus,
+  EmailPurpose,
+  EmailStatus,
   EntryStatus,
   JackpotStatus,
   LeagueStatus,
@@ -16,8 +18,6 @@ import {
   ObligationStatus,
   PayoutAttemptStatus,
   ResultStatus,
-  SmsPurpose,
-  SmsStatus,
   UserStatus,
 } from '@predict/contracts';
 import { pgEnum } from 'drizzle-orm/pg-core';
@@ -47,5 +47,5 @@ export const jackpotStatus = pgEnum('jackpot_status', values(JackpotStatus));
 export const mediaKind = pgEnum('media_kind', values(MediaKind));
 export const mediaStatus = pgEnum('media_status', values(MediaStatus));
 export const mediaBucket = pgEnum('media_bucket', ['public', 'private']);
-export const smsPurpose = pgEnum('sms_purpose', values(SmsPurpose));
-export const smsStatus = pgEnum('sms_status', values(SmsStatus));
+export const emailPurpose = pgEnum('email_purpose', values(EmailPurpose));
+export const emailStatus = pgEnum('email_status', values(EmailStatus));

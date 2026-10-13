@@ -147,6 +147,7 @@ function EntryDetails({
           >
             {item.user.displayName}
           </Link>
+          <span className="block text-xs break-all text-muted-foreground">{item.user.email}</span>
           <span className="block font-mono text-xs text-muted-foreground">{item.user.phone}</span>
         </Detail>
         <Detail label="Match-day">

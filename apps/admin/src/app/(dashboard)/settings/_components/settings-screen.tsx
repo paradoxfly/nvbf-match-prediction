@@ -42,7 +42,7 @@ export function SettingsScreen() {
           <div className="flex flex-col gap-4">
             <CollectionAccountCard settings={data} canEdit={canEdit} />
             <div className="grid gap-4 lg:grid-cols-2">
-              <SmsCard settings={data} canEdit={canEdit} />
+              <EmailCard settings={data} canEdit={canEdit} />
               <SupportCard key={data.supportContact ?? ''} settings={data} canEdit={canEdit} />
             </div>
             <DefaultsCard settings={data} canEdit={canEdit} />
@@ -222,25 +222,25 @@ function AccountForm({ settings, onDone }: { settings: Settings; onDone: () => v
   );
 }
 
-function SmsCard({ settings, canEdit }: { settings: Settings; canEdit: boolean }) {
+function EmailCard({ settings, canEdit }: { settings: Settings; canEdit: boolean }) {
   const toast = useToast();
   const save = useSaveSettings();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Text messages</CardTitle>
+        <CardTitle>Emails</CardTitle>
       </CardHeader>
       <SwitchField
-        label="Text players when their payment is confirmed"
-        description="Costs one SMS per confirmed entry. Players always see the status in the app."
-        checked={settings.smsOnPaymentConfirmed}
+        label="Email players when their payment is confirmed"
+        description="Uses one email per confirmed entry from your Zapiack plan. Players always see the status in the app."
+        checked={settings.emailOnPaymentConfirmed}
         disabled={!canEdit || save.isPending}
         onCheckedChange={(checked) =>
           save.mutate(
-            { smsOnPaymentConfirmed: checked },
+            { emailOnPaymentConfirmed: checked },
             {
               onSuccess: () =>
-                toast({ title: checked ? 'Confirmation texts on' : 'Confirmation texts off' }),
+                toast({ title: checked ? 'Confirmation emails on' : 'Confirmation emails off' }),
             },
           )
         }

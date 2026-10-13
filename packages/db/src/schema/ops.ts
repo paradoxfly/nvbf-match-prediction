@@ -1,26 +1,35 @@
 import type { CollectionAccount, DayConfig } from '@predict/contracts';
 import { sql } from 'drizzle-orm';
 import { boolean, check, index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { id, timestamps, tstz } from './_shared';
-import { smsPurpose, smsStatus } from './enums';
+import { citext, id, timestamps, tstz } from './_shared';
+import { emailPurpose, emailStatus } from './enums';
 import { adminUsers, users } from './identity';
 
+/** What a notification email says. The provider's one message template lays it out. */
+export interface EmailContent {
+  subject: string;
+  heading: string;
+  paragraphs: string[];
+  action?: { label: string; url: string };
+}
+
 /**
- * Every text message: OTPs (never with the code in `body`) and notifications. Doubles as the
- * outbox for notifications and as the durable source for per-phone OTP limits.
+ * Every email: sign-in codes (never with the code stored) and notifications. Doubles as the
+ * outbox for notifications and as the durable source for per-address code limits.
  */
-export const smsMessages = pgTable(
-  'sms_messages',
+export const emailMessages = pgTable(
+  'email_messages',
   {
     id: id(),
-    toPhone: text().notNull(),
+    toEmail: citext().notNull(),
     userId: uuid().references(() => users.id, { onDelete: 'set null' }),
-    purpose: smsPurpose().notNull(),
-    /** Null for OTPs: codes are never stored. */
-    body: text(),
+    purpose: emailPurpose().notNull(),
+    subject: text().notNull(),
+    /** Null for sign-in codes: they are never stored. */
+    content: jsonb().$type<EmailContent>(),
     provider: text().notNull(),
     providerMessageId: text(),
-    status: smsStatus().notNull().default('queued'),
+    status: emailStatus().notNull().default('queued'),
     error: text(),
     attempts: integer().notNull().default(0),
     ipHash: text(),
@@ -29,7 +38,7 @@ export const smsMessages = pgTable(
     createdAt: tstz().notNull().defaultNow(),
   },
   (t) => [
-    index().on(t.toPhone, t.createdAt),
+    index().on(t.toEmail, t.createdAt),
     index().on(t.status, t.sendAfter),
     index().on(t.createdAt),
   ],
@@ -44,8 +53,8 @@ export const settings = pgTable(
     collectionAccount: jsonb().$type<CollectionAccount>(),
     /** Defaults for new leagues. */
     defaultDayConfig: jsonb().$type<DayConfig>().notNull(),
-    /** Text players when their payment is confirmed (costs one SMS per entry). */
-    smsOnPaymentConfirmed: boolean().notNull().default(false),
+    /** Email players when their payment is confirmed. */
+    emailOnPaymentConfirmed: boolean().notNull().default(false),
     supportContact: text(),
     updatedByAdminId: uuid().references(() => adminUsers.id),
     ...timestamps,

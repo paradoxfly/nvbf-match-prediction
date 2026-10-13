@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { product } from '@predict/brand';
 import type {
   AdminLeaderboard,
   AdminRole,
@@ -28,7 +27,7 @@ import {
   type Database,
   type Executor,
 } from '@predict/db';
-import { formatNaira, ordinal, summarizeSetLine, validateSetLine } from '@predict/domain';
+import { ordinal, summarizeSetLine, validateSetLine } from '@predict/domain';
 import { AuditService, type Actor } from '../common/audit.service';
 import { DomainError } from '../common/domain-error';
 import type { DayRow } from '../contest/contest-read.service';
@@ -37,7 +36,8 @@ import { DB } from '../database/database.module';
 import { LedgerService, type LedgerAccount } from '../ledger/ledger.service';
 import { ObligationsService } from '../payouts/obligations.service';
 import { DaysService } from '../setup/days.service';
-import { SmsService } from '../sms/sms.service';
+import { EmailService } from '../email/email.service';
+import { dayCancelledEmail, prizeWonEmail } from '../email/messages';
 import { LeaderboardService, toRow, type ComputedLeaderboard } from './leaderboard.service';
 
 /** Results entry, the staff leaderboard, and closing a day out (finalize, reopen, cancel). */
@@ -50,7 +50,7 @@ export class ResultsService {
     private readonly obligations: ObligationsService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
-    private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly cache: TtlCache,
   ) {}
 
@@ -380,7 +380,7 @@ export class ResultsService {
       });
 
       const winners = board.rows.filter((row) => row.prizeKobo > 0);
-      const phones = winners.length
+      const winnerUsers = winners.length
         ? await tx
             .select()
             .from(users)
@@ -392,12 +392,17 @@ export class ResultsService {
             )
         : [];
       for (const row of winners) {
-        const user = phones.find((p) => p.id === row.userId);
+        const user = winnerUsers.find((p) => p.id === row.userId);
         if (!user) continue;
-        await this.sms.queue(
+        await this.email.queue(
           tx,
-          user.phone,
-          `${product.name}: you finished ${ordinal(row.ranked.rank)} on ${day.date} and won ${formatNaira(row.prizeKobo)}! Check your bank details in the app so we can pay you.`,
+          user.email,
+          prizeWonEmail({
+            rank: row.ranked.rank,
+            date: day.date,
+            prizeKobo: row.prizeKobo,
+            link: this.email.link('/me'),
+          }),
           'winner',
           user.id,
         );
@@ -489,11 +494,11 @@ export class ResultsService {
         throw new DomainError('BAD_STATUS');
       const now = new Date();
       const paid = await tx
-        .select({ entry: entries, phone: users.phone })
+        .select({ entry: entries, email: users.email })
         .from(entries)
         .innerJoin(users, eq(users.id, entries.userId))
         .where(and(eq(entries.matchDayId, dayId), eq(entries.status, 'confirmed')));
-      for (const { entry, phone } of paid) {
+      for (const { entry, email } of paid) {
         await tx
           .update(entries)
           .set({ status: 'refunded', refundedAt: now })
@@ -514,10 +519,14 @@ export class ResultsService {
           refType: 'payout_obligation',
           refId: obligation!.id,
         });
-        await this.sms.queue(
+        await this.email.queue(
           tx,
-          phone,
-          `${product.name}: the ${day.date} contest was cancelled. Your ${formatNaira(entry.feeKobo)} will be refunded in full; check your bank details in the app.`,
+          email,
+          dayCancelledEmail({
+            date: day.date,
+            feeKobo: entry.feeKobo,
+            link: this.email.link('/me'),
+          }),
           'notice',
           entry.userId,
         );
