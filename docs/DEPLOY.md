@@ -64,7 +64,7 @@ Create each one with **Create Service → Application**, then set these in its *
 **Build Type: Dockerfile**
 
 - **Docker File**: the app's Dockerfile from the table above
-- **Docker Context Path**: `.` (the repo root; every Dockerfile needs the shared `packages/`)
+- **Docker Context Path**: `.` (the repo root). **Required, don't leave it empty.** Empty means Dokploy builds from the Dockerfile's own folder (e.g. `apps/api`), and the build fails with `"/pnpm-workspace.yaml": not found`, because every Dockerfile needs the repo root and the shared `packages/`.
 - **Docker Build Stage**: leave empty
 
 **Environment tab**
@@ -197,6 +197,14 @@ Optional: `NEXT_PUBLIC_SENTRY_DSN`.
 6. Set up backups (next section) before taking real money.
 
 Each image has a built-in health check (API: `/v1/health`; sites: the home page), which Dokploy uses to tell when a new version is ready.
+
+### If the API won't start
+
+The API applies migrations before it starts, and its **Logs** say why if that fails, starting with `Migrations failed against <user>@<host>/<database>` and a hint. The usual causes:
+
+- **Host not found** (`ENOTFOUND` / `EAI_AGAIN`, retried for a minute first): the host in `DATABASE_URL` must be the Postgres service's **App Name**. Copy its **Internal Connection URL** rather than typing it.
+- **Wrong password** (`28P01`): copy the Internal Connection URL again. A hand-typed password with `@ : / # ? % &` in it must be URL-encoded.
+- **No such database** (`3D000`) or **permission denied** (`42501`): use the database name and user from the Internal Connection URL.
 
 ## 4. Updates
 
