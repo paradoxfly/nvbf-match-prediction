@@ -43,7 +43,7 @@ export class MediaService {
     if (!rules.mimeTypes.includes(input.mimeType)) throw new DomainError('UNSUPPORTED_TYPE');
     if (input.sizeBytes > rules.maxBytes) throw new DomainError('TOO_LARGE');
 
-    const storageKey = `${this.env.STORAGE_KEY_PREFIX}${input.kind}/${uuidv7()}`;
+    const storageKey = `${input.kind}/${uuidv7()}`;
     const [asset] = await this.db
       .insert(mediaAssets)
       .values({

@@ -29,9 +29,8 @@ function keyFrom(path: string | string[]): string {
 }
 
 /**
- * Plays the part of R2 in development: accepts signed uploads and serves objects.
- * Only registered when STORAGE_DRIVER=local. The signature is the credential here, so the
- * first-party header check does not apply.
+ * Accepts signed uploads and serves stored files (through the sites' /api proxy). The signature
+ * is the credential here, so the first-party header check does not apply.
  */
 @Controller('storage')
 @SetMetadata(SKIP_CLIENT_HEADER, true)
@@ -107,7 +106,8 @@ export class LocalStorageController {
     res.setHeader('Content-Type', info.contentType ?? 'application/octet-stream');
     res.setHeader('Content-Length', String(info.size));
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (bucket === 'public') res.setHeader('Cache-Control', 'public, max-age=3600');
+    // Every upload gets a new random key, so a public file never changes once it's in use.
+    if (bucket === 'public') res.setHeader('Cache-Control', 'public, max-age=86400');
     await pipeline(createReadStream(this.storage.pathFor(bucket, key)), res);
   }
 }

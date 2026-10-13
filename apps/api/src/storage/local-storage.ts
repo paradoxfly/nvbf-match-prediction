@@ -5,8 +5,8 @@ import { hmac, safeEqual } from '../common/crypto';
 import type { Bucket, ObjectInfo, ObjectStorage, PresignedUpload } from './storage';
 
 /**
- * Files on local disk, for development and tests. The API itself stands in for the storage
- * service: uploads and private downloads use HMAC-signed URLs checked by LocalStorageController.
+ * Files on the API's disk: a Docker volume in production, a folder in development and tests.
+ * Uploads and private downloads use HMAC-signed URLs checked by LocalStorageController.
  */
 export class LocalStorage implements ObjectStorage {
   readonly root: string;

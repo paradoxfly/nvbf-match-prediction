@@ -16,7 +16,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
                                    │
                              api (NestJS) ── email (Zapiack)
                               │      │
-                         Postgres   Redis           logos → scoutgram's R2 bucket, under predict/
+                         Postgres   Redis           logos → uploads volume on the server
 ```
 
 - **The browser only ever talks to web or admin.** Both proxy `/api/*` to the API, so session cookies are first-party and the API needs no public domain.
@@ -33,7 +33,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
    - Create the message template **on your own machine, before deploying** (the API won't start in production without it): put `ZAPIACK_API_KEY` in `.env`, then run `pnpm build && pnpm --filter @predict/api zapiack:template`. It prints the template id and whether it's approved; check again later with `--status <id>` if it went to review.
    - Send yourself a test with `--test-to you@example.com` once `ZAPIACK_TEMPLATE_ID` and `EMAIL_FROM` are set (locally, or later from the API's terminal in Dokploy).
    - **Plan:** the free plan allows 100 emails a day, and every sign-in uses one. Move to a paid plan before launch.
-2. **Logos (R2):** reuse scoutgram's public R2 bucket and API token (`R2_*` values). Every file goes under `STORAGE_KEY_PREFIX` (`predict/`), so nothing collides with scoutgram's files. Logos upload straight from the admin browser, so add `https://predict-admin.scoutgram.africa` to the bucket's CORS rules (method `PUT`, header `content-type`).
+2. **Logos:** nothing to set up beyond the `predict-uploads` volume on the API app in Dokploy (see [DEPLOY.md](DEPLOY.md)). The API stores and serves the files itself.
 3. **Deploy on Dokploy:** follow [DEPLOY.md](DEPLOY.md). Migrations run automatically when the API starts.
    - `AUTH_SECRET` and `DATA_ENCRYPTION_KEY`: generate both fresh and keep them in a password manager. If you lose `DATA_ENCRYPTION_KEY`, the stored bank account numbers can no longer be read.
 4. **First staff account:** in Dokploy, open the API app's terminal and run
@@ -108,7 +108,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 
 ## Backups
 
-- **Nightly backups:** turn on scheduled backups for the Postgres service in Dokploy (to an S3-compatible destination such as a private R2 bucket). See [DEPLOY.md](DEPLOY.md).
+- **Nightly backups:** turn on scheduled backups for the Postgres service in Dokploy, to a private S3-compatible bucket. Logos live on the `predict-uploads` volume. See [DEPLOY.md](DEPLOY.md#5-backups).
 - **Restore drill:** do this before launch, then monthly. Restore a backup into a scratch database and point a local API at it to check it.
 - **Encryption key:** keep `DATA_ENCRYPTION_KEY` with the backups' recovery notes. A restore without it can't read bank account numbers.
 

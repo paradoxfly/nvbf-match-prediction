@@ -25,10 +25,8 @@ describe('parseEnv', () => {
     );
   });
 
-  it('refuses console email and local storage in production', () => {
-    expect(() => parseEnv({ ...BASE, NODE_ENV: 'production' })).toThrow(
-      /STORAGE_DRIVER[\s\S]*EMAIL_TRANSPORT/,
-    );
+  it('refuses console email in production', () => {
+    expect(() => parseEnv({ ...BASE, NODE_ENV: 'production' })).toThrow(/EMAIL_TRANSPORT/);
   });
 
   it('turns on admin MFA and secure cookies by default in production only', () => {
@@ -39,12 +37,6 @@ describe('parseEnv', () => {
       EMAIL_TRANSPORT: 'zapiack',
       ZAPIACK_API_KEY: 'k',
       ZAPIACK_TEMPLATE_ID: 'tmpl_x',
-      STORAGE_DRIVER: 'r2',
-      R2_ACCOUNT_ID: 'a',
-      R2_ACCESS_KEY_ID: 'b',
-      R2_SECRET_ACCESS_KEY: 'c',
-      R2_BUCKET_NAME: 'd',
-      R2_PUBLIC_URL: 'https://cdn.example.com',
     });
     expect(prod.ADMIN_MFA_REQUIRED).toBe(true);
     expect(prod.COOKIE_SECURE).toBe(true);

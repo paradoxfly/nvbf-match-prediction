@@ -55,20 +55,12 @@ const EnvSchema = z
     TURNSTILE_SECRET_KEY: optional(z.string()),
 
     /**
-     * `local` keeps files under STORAGE_LOCAL_DIR and serves them from the API (development and
-     * tests). `r2` uses a public Cloudflare R2 bucket for team and sponsor logos.
+     * Where uploaded logos are kept on disk. In production this is a Docker volume
+     * (the image sets /data/uploads); the API serves the files itself.
      */
-    STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
     STORAGE_LOCAL_DIR: z.string().default('.storage'),
-    /** Browser-visible base path of the API's local storage routes (through the /api rewrite). */
+    /** Browser-visible base path of the API's storage routes (through the /api rewrite). */
     STORAGE_LOCAL_BASE_URL: z.string().default('/api/v1/storage'),
-    /** Namespaces every object key, so a bucket can be shared with other projects safely. */
-    STORAGE_KEY_PREFIX: z.string().default('predict/'),
-    R2_ACCOUNT_ID: optional(z.string()),
-    R2_ACCESS_KEY_ID: optional(z.string()),
-    R2_SECRET_ACCESS_KEY: optional(z.string()),
-    R2_BUCKET_NAME: optional(z.string()),
-    R2_PUBLIC_URL: optional(z.url()),
 
     SENTRY_DSN: optional(z.url()),
     /** Seconds between background ticks (auto-open/close days, email outbox). 0 = off. */
@@ -81,25 +73,7 @@ const EnvSchema = z
           ctx.addIssue({ code: 'custom', path: [key], message: 'Required for zapiack.' });
       }
     }
-    if (env.STORAGE_DRIVER === 'r2') {
-      for (const key of [
-        'R2_ACCOUNT_ID',
-        'R2_ACCESS_KEY_ID',
-        'R2_SECRET_ACCESS_KEY',
-        'R2_BUCKET_NAME',
-        'R2_PUBLIC_URL',
-      ] as const) {
-        if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'Required for r2.' });
-      }
-    }
     if (env.NODE_ENV === 'production') {
-      if (env.STORAGE_DRIVER !== 'r2') {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['STORAGE_DRIVER'],
-          message: 'Production must use r2.',
-        });
-      }
       if (env.EMAIL_TRANSPORT === 'console') {
         ctx.addIssue({
           code: 'custom',

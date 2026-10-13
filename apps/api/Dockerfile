@@ -5,6 +5,7 @@
 #   docker build -f apps/api/Dockerfile -t predict-api .
 #
 # On start the container applies pending database migrations, then serves on $PORT (4000).
+# Uploaded logos are kept in /data/uploads: mount a volume there so they survive redeploys.
 # One-off commands run in the same container (e.g. from Dokploy's "Open Terminal"):
 #
 #   node dist/scripts/create-admin.js --email you@scoutgram.africa --name "You" --role super_admin
@@ -52,9 +53,12 @@ FROM ${NODE_IMAGE} AS runtime
 ARG APP_VERSION=0.0.0
 ENV NODE_ENV=production \
     PORT=4000 \
-    APP_VERSION=${APP_VERSION}
+    APP_VERSION=${APP_VERSION} \
+    STORAGE_LOCAL_DIR=/data/uploads
+# The only place the app writes. A new named volume mounted here starts with this ownership.
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
 WORKDIR /app
-# Owned by root and read-only to the app user. Uploads go to R2, so nothing is written here.
+# Owned by root and read-only to the app user.
 COPY --from=build /out/package.json ./package.json
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /repo/apps/api/dist ./dist

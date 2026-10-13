@@ -43,7 +43,7 @@ import { StorageModule } from './storage/storage.module';
     RedisModule,
     CommonModule,
     EmailModule,
-    StorageModule.register(),
+    StorageModule,
     HealthModule,
     AuthModule,
     AdminModule,

@@ -8,26 +8,12 @@ const csp = {
   // Next injects inline bootstrap scripts; dev mode also needs eval for fast refresh.
   'script-src': ["'self'", "'unsafe-inline'", ...(production ? [] : ["'unsafe-eval'"])],
   'style-src': ["'self'", "'unsafe-inline'"],
-  // Photos and videos come from the media bucket's own domain.
-  'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-  'media-src': ["'self'", 'blob:', 'https:'],
+  // Logos are uploaded to and served by the API through this site's /api proxy.
+  'img-src': ["'self'", 'data:', 'blob:'],
   'font-src': ["'self'", 'data:'],
-  // Uploads go straight to the bucket with presigned URLs; errors go to Sentry.
-  'connect-src': [
-    "'self'",
-    'https://*.r2.cloudflarestorage.com',
-    'https://*.sentry.io',
-    ...(production ? [] : ['ws:']),
-  ],
-  // Video embeds, and PDFs served from the private bucket.
-  'frame-src': [
-    "'self'",
-    'https://www.youtube-nocookie.com',
-    'https://www.youtube.com',
-    'https://player.vimeo.com',
-    'https://drive.google.com',
-    'https://*.r2.cloudflarestorage.com',
-  ],
+  // Errors go to Sentry.
+  'connect-src': ["'self'", 'https://*.sentry.io', ...(production ? [] : ['ws:'])],
+  'frame-src': ["'none'"],
   'frame-ancestors': ["'none'"],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
