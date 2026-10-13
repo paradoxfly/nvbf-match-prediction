@@ -437,7 +437,9 @@ function FoldedSummary(props: BadgeProps & { scoring: ScoringConfig; names: Team
   const { match, locked, dayStatus, saved, check, dirty, scoring, names } = props;
   const pickText = (sets: readonly { home: number; away: number }[]) => {
     const homeSets = sets.filter((set) => set.home > set.away).length;
-    return `${majorLabel({ homeSets, awaySets: sets.length - homeSets }, names)} · ${formatSets(sets)}`;
+    const text = `${majorLabel({ homeSets, awaySets: sets.length - homeSets }, names)} · ${formatSets(sets)}`;
+    // Word joiners around each dash: a long pick wraps between scores, never inside "25–20".
+    return text.replaceAll('–', '\u2060–\u2060');
   };
 
   // A plain hint when there's nothing to show yet, otherwise "Your pick: …".
@@ -471,7 +473,7 @@ function FoldedSummary(props: BadgeProps & { scoring: ScoringConfig; names: Team
     <span className="flex w-full items-start justify-between gap-3">
       <span className="flex min-w-0 flex-col gap-0.5">
         {pick !== null ? (
-          <span className="truncate font-mono text-xs font-bold">
+          <span className="font-mono text-xs font-bold break-words">
             <span className="font-sans font-normal text-muted-foreground">Your pick: </span>
             {pick}
           </span>
@@ -479,7 +481,7 @@ function FoldedSummary(props: BadgeProps & { scoring: ScoringConfig; names: Team
           <span className="text-xs text-muted-foreground">{hint}</span>
         )}
         {match.result ? (
-          <span className="truncate font-mono text-xs">
+          <span className="font-mono text-xs break-words">
             <span className="font-sans text-muted-foreground">Result: </span>
             {pickText(match.result.sets)}
           </span>
@@ -516,7 +518,7 @@ export function MatchCard(props: MatchCardProps) {
     <article
       aria-labelledby={headingId}
       className={cn(
-        'flex flex-col gap-4 rounded-lg bg-card p-4 shadow-card sm:p-5',
+        'flex min-w-0 flex-col gap-4 rounded-lg bg-card p-4 shadow-card sm:p-5',
         !expanded && 'gap-3',
         props.dirty && !locked && 'ring-2 ring-sg-night/80',
       )}
