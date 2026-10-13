@@ -9,6 +9,7 @@ export {
 } from './client';
 export { migrateDatabase, migrationsFolder } from './migrate';
 export { seedReferenceData } from './seed-data';
+export { ALWAYS_KEEP, clearTables, planReset, type ResetPlan } from './reset';
 export {
   and,
   arrayContains,

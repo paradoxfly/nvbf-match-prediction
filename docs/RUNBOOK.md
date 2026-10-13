@@ -58,6 +58,15 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 
    Opening freezes the day's money and scoring settings and stores the rules players agree to.
 
+## Clearing test data before launch
+
+To start clean after testing, open the API's terminal in Dokploy and run:
+
+1. `node dist/scripts/reset-data.js` shows what would be cleared, with row counts. Nothing changes.
+2. `node dist/scripts/reset-data.js --confirm <database name>` clears it. The name is the one the preview prints.
+
+It keeps player and staff accounts, sign-in sessions and settings (including the collection account). Everything else goes: leagues, teams, days, entries, payments, payouts, bank details, emails, the money journal, the audit log and uploaded logos. To keep something too, add e.g. `--keep teams --keep media_assets` (teams and their logos). Take a database backup first if in any doubt; this can't be undone.
+
 ## A match-day
 
 1. **Open** the day (or let the scheduled opening do it). Players join, pay by transfer using their reference, and make picks.
