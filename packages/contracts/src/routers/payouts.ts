@@ -65,6 +65,7 @@ export const payoutsContract = {
   /**
    * Sets where winnings go. The first account works straight away; a change takes effect after
    * 24 hours and we email you about it, so someone else can't redirect your money quietly.
+   * A correction after staff marked the details invalid counts straight away.
    */
   saveAccount: oc
     .route({ method: 'PUT', path: '/me/payout-account', tags: ['payouts'] })

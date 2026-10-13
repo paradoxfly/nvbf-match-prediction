@@ -30,6 +30,7 @@ The PRD (`daily_volleyball_prediction_contest_prd.md`) is the base. Where this f
 7. **Jackpot ties:** among players equally close, the one who submitted first wins.
 8. **Jackpot predictions are final once submitted** (owner, 13 Oct 2026): each player submits once, and nobody can change it afterwards, staff included. A database trigger enforces this.
 9. **Fixed jackpot deadline** (owner, 13 Oct 2026): staff set the deadline when creating the league. They can change it only until the first prediction is submitted; after that it is fixed, because moving it would be unfair to players who can no longer change their prediction.
+10. **Corrected bank details** (owner, 14 Oct 2026): when staff mark a payout's bank details invalid, the player's correction is used straight away instead of after the usual 24-hour wait, since the old account is known not to work. The payout returns to Ready with a note asking finance to compare the bank's name check with the old account name. The player is still emailed about the change.
 
 ## Fairness rule (design review)
 

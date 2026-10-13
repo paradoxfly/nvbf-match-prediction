@@ -47,6 +47,9 @@ type ObligationRow = typeof payoutObligations.$inferSelect;
 
 /** A changed payout account only takes effect after this delay (SIM-swap protection). */
 const ACCOUNT_CHANGE_DELAY_MS = 24 * 3600_000;
+const CORRECTED_NOTE =
+  "The player sent new bank details after these were marked invalid. Check the bank's name " +
+  'check against the old account name before paying.';
 
 export interface NewObligation {
   kind: ObligationKind;
@@ -114,7 +117,9 @@ export class ObligationsService {
 
   /**
    * Saves where winnings go. The first account counts straight away. A change waits 24 hours
-   * (and we email the player), so someone else can't quietly redirect their money.
+   * (and we email the player), so someone else can't quietly redirect their money. Except when
+   * staff have marked the current details invalid: there's nothing left to protect then, so the
+   * correction counts straight away and the payout goes back to Ready (owner decision).
    */
   async saveAccount(userId: string, input: SavePayoutAccountInput): Promise<MyPayoutAccount> {
     await enforceLimits(this.limits, [
@@ -152,7 +157,19 @@ export class ObligationsService {
             gt(payoutAccounts.activeFrom, now),
           ),
         );
-      const activeFrom = current ? new Date(now.getTime() + ACCOUNT_CHANGE_DELAY_MS) : now;
+      const [invalid] = await tx
+        .select({ n: count() })
+        .from(payoutObligations)
+        .where(
+          and(
+            eq(payoutObligations.userId, userId),
+            eq(payoutObligations.status, 'details_invalid'),
+            isNull(payoutObligations.supersededAt),
+          ),
+        );
+      const correcting = (invalid?.n ?? 0) > 0;
+      const delayed = Boolean(current) && !correcting;
+      const activeFrom = delayed ? new Date(now.getTime() + ACCOUNT_CHANGE_DELAY_MS) : now;
       await tx.insert(payoutAccounts).values({
         userId,
         bankCode: input.bankCode,
@@ -168,13 +185,12 @@ export class ObligationsService {
         await this.email.queue(
           tx,
           user.email,
-          payoutAccountChangedEmail({ activeFrom }),
+          payoutAccountChangedEmail({ activeFrom: delayed ? activeFrom : null }),
           'payout_account_changed',
           userId,
         );
-      } else {
-        await this.promoteReady(tx, userId);
       }
+      if (!delayed) await this.promoteReady(tx, userId);
       await this.audit.record(
         tx,
         { type: 'user', id: userId },
@@ -182,7 +198,12 @@ export class ObligationsService {
           action: current ? 'payout_account.change_requested' : 'payout_account.added',
           targetType: 'user',
           targetId: userId,
-          metadata: { bankCode: input.bankCode, last4: input.accountNumber.slice(-4), activeFrom },
+          metadata: {
+            bankCode: input.bankCode,
+            last4: input.accountNumber.slice(-4),
+            activeFrom,
+            ...(correcting ? { correctsInvalidDetails: true } : {}),
+          },
         },
       );
     });
@@ -224,12 +245,17 @@ export class ObligationsService {
     }));
   }
 
-  /** Obligations waiting for bank details become payable once the player has an account. */
+  /**
+   * Obligations waiting for bank details become payable once the player has an account. Ones
+   * whose details staff had marked invalid keep a note, so finance double-checks the new account.
+   */
   async promoteReady(executor: Executor, userId?: string) {
     const now = new Date();
     await executor.execute(sql`
       update ${payoutObligations} o
-      set status = 'ready', status_note = null, updated_at = now()
+      set status = 'ready',
+        status_note = case when o.status = 'details_invalid' then ${CORRECTED_NOTE} end,
+        updated_at = now()
       where o.status in ('awaiting_details', 'details_invalid')
         and o.superseded_at is null
         and o.user_id is not null

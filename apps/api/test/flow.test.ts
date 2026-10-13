@@ -210,6 +210,42 @@ describe('a full match-day', () => {
     expect(change.body.current.last4).toBe('6789');
     expect(change.body.pending.last4).toBe('3210');
 
+    // Bayo's details fail. His correction counts straight away (no 24-hour wait), and his
+    // payout goes back to Ready with a note for finance.
+    await bayo.player
+      .put('/v1/me/payout-account')
+      .send({ bankCode: '058', accountNumber: '1111111111', accountName: 'Bayo A' })
+      .expect(200);
+    const bayoOwed = (await bayo.player.get('/v1/me/obligations').expect(200)).body.items[0];
+    expect(bayoOwed.status).toBe('ready');
+    await finance
+      .post(`/v1/admin/obligations/${bayoOwed.id}/invalid-details`)
+      .send({ reason: 'Bank says the account number is wrong' })
+      .expect(200);
+    expect((await bayo.player.get('/v1/me/obligations').expect(200)).body.items[0].status).toBe(
+      'details_invalid',
+    );
+
+    const fixed = await bayo.player
+      .put('/v1/me/payout-account')
+      .send({ bankCode: '058', accountNumber: '2222222222', accountName: 'Bayo A' })
+      .expect(200);
+    expect(fixed.body.current.last4).toBe('2222');
+    expect(fixed.body.pending).toBeNull();
+    const ready = await finance.get(`/v1/admin/obligations?status=ready`).expect(200);
+    const corrected = ready.body.items.find((item: { id: string }) => item.id === bayoOwed.id);
+    expect(corrected.account.last4).toBe('2222');
+    expect(corrected.statusNote).toMatch(/new bank details/);
+    await finance
+      .post(`/v1/admin/obligations/${bayoOwed.id}/start`)
+      .send({ nameEnquiryName: 'BAYO A' })
+      .expect(200);
+    const notice = await t.db.execute<{ content: { paragraphs: string[] } }>(sql`
+      select content from email_messages where purpose = 'payout_account_changed'
+      order by created_at desc limit 1
+    `);
+    expect(notice.rows[0]!.content.paragraphs[0]).toMatch(/straight away/);
+
     // Payouts have started, so the day can't be reopened.
     const reopen = await setup.admin
       .post(`/v1/admin/days/${setup.dayId}/reopen`)

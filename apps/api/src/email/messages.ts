@@ -97,12 +97,15 @@ export function jackpotWonEmail(input: {
   };
 }
 
-export function payoutAccountChangedEmail(input: { activeFrom: Date }): EmailContent {
+/** `activeFrom` null: the new account is used straight away (it replaced details that failed). */
+export function payoutAccountChangedEmail(input: { activeFrom: Date | null }): EmailContent {
   return {
     subject: 'Your payout bank details were changed',
     heading: 'Your bank details were changed',
     paragraphs: [
-      `The bank account we pay your winnings into was changed. We'll start using the new account from ${formatWatDateTime(input.activeFrom)}.`,
+      input.activeFrom
+        ? `The bank account we pay your winnings into was changed. We'll start using the new account from ${formatWatDateTime(input.activeFrom)}.`
+        : "The bank account we pay your winnings into was changed. We'll use the new account straight away.",
       `Not you? Contact ${product.supportEmail} right away and we'll stop it.`,
     ],
   };

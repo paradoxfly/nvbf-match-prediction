@@ -157,7 +157,8 @@ const QUESTIONS: Question[] = [
         </p>
         <p>
           Add your bank details under <Link href="/me">Me</Link>. You can follow each payment there
-          too. A change of bank details takes effect after 24 hours, and we email you about it.
+          too. A change of bank details takes effect after 24 hours, and we email you about it. If
+          we tell you your details didn&apos;t work, your correction counts straight away.
         </p>
       </>
     ),

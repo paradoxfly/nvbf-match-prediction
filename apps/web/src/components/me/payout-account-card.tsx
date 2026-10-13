@@ -150,7 +150,8 @@ export function PayoutAccountCard() {
         <ShieldCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
         <span>
           We only use these details to pay you, and only our finance team can see them. A change
-          takes effect after 24 hours, and we email you about it.
+          takes effect after 24 hours (straight away if we told you your details didn&apos;t work),
+          and we email you about it.
         </span>
       </p>
 
