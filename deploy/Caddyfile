@@ -1,0 +1,16 @@
+# Public site and staff dashboard on their own subdomains. Caddy gets and renews TLS
+# certificates automatically. The API is never exposed: each Next app proxies /api/* to it on
+# the private Docker network, so cookies stay first-party.
+{
+	email {$ACME_EMAIL}
+}
+
+{$WEB_HOST:predict.scoutgram.africa} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$ADMIN_HOST:predict-admin.scoutgram.africa} {
+	encode zstd gzip
+	reverse_proxy admin:3001
+}

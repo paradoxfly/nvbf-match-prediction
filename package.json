@@ -1,0 +1,27 @@
+{
+  "name": "predict",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @predict/db db:generate",
+    "db:migrate": "pnpm --filter @predict/db db:migrate",
+    "db:seed": "pnpm --filter @predict/db db:seed",
+    "db:studio": "pnpm --filter @predict/db db:studio",
+    "test:pg": "pnpm --filter @predict/api test:pg"
+  },
+  "devDependencies": {
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,11 @@
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import base from './base.js';
+
+/** Nest needs runtime class imports for DI, so type-only import enforcement is relaxed. */
+export default tseslint.config(...base, {
+  languageOptions: { globals: { ...globals.node } },
+  rules: {
+    '@typescript-eslint/consistent-type-imports': 'off',
+  },
+});

@@ -1,0 +1,118 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies allowed to run install scripts (pnpm 11 blocks them by default).
+allowBuilds:
+  esbuild: true
+  '@swc/core': true
+  sharp: true
+  unrs-resolver: true
+  '@nestjs/core': false
+  # Only needed for source-map upload, which isn't wired yet.
+  '@sentry/cli': false
+
+# Security fixes for transitive dependencies (remove once the parent package ships them).
+overrides:
+  # Via @nestjs/platform-express. The API doesn't parse multipart bodies, but stay patched.
+  multer: 2.3.0
+
+catalog:
+  # tooling
+  typescript: 5.9.3
+  turbo: 2.11.2
+  prettier: 3.9.8
+  tsup: 8.5.1
+  tsx: 4.23.15
+  vitest: 5.0.1
+  # eslint-plugin-react (via eslint-config-next) does not support ESLint 10 yet.
+  eslint: 9.39.5
+  '@eslint/js': 9.39.5
+  typescript-eslint: 8.70.1
+  globals: 17.12.0
+  '@types/node': ^22.13.0
+  # shared runtime
+  zod: 4.6.5
+  '@orpc/contract': 1.15.3
+  '@orpc/server': 1.15.3
+  '@orpc/client': 1.15.3
+  '@orpc/openapi': 1.15.3
+  '@orpc/openapi-client': 1.15.3
+  '@orpc/nest': 1.15.3
+  '@orpc/zod': 1.15.3
+  '@orpc/tanstack-query': 1.15.3
+  '@tanstack/react-query': 5.103.2
+  drizzle-orm: 0.45.3
+  drizzle-kit: 0.31.11
+  drizzle-zod: 0.8.3
+  pg: 8.23.0
+  '@types/pg': 8.23.1
+  # react / next
+  next: 16.3.5
+  react: 19.3.0
+  react-dom: 19.3.0
+  '@types/react': ^19.2.0
+  '@types/react-dom': ^19.2.0
+  eslint-config-next: 16.3.5
+  tailwindcss: 4.3.3
+  '@tailwindcss/postcss': 4.3.3
+  '@sentry/nextjs': 10.75.1
+  # nest
+  '@nestjs/common': 11.2.5
+  '@nestjs/core': 11.2.5
+  '@nestjs/platform-express': 11.2.5
+  '@nestjs/testing': 11.2.5
+  '@nestjs/cli': 11.0.24
+  '@sentry/nestjs': 10.75.1
+
+minimumReleaseAgeExclude:
+  - '@orpc/client@1.15.3'
+  - '@orpc/contract@1.15.3'
+  - '@orpc/shared@1.15.3'
+  - '@orpc/standard-server-fetch@1.15.3'
+  - '@orpc/standard-server-peer@1.15.3'
+  - '@orpc/standard-server@1.15.3'
+  - '@typescript-eslint/eslint-plugin@8.70.1'
+  - '@typescript-eslint/parser@8.70.1'
+  - '@typescript-eslint/project-service@8.70.1'
+  - '@typescript-eslint/scope-manager@8.70.1'
+  - '@typescript-eslint/tsconfig-utils@8.70.1'
+  - '@typescript-eslint/type-utils@8.70.1'
+  - '@typescript-eslint/types@8.70.1'
+  - '@typescript-eslint/typescript-estree@8.70.1'
+  - '@typescript-eslint/utils@8.70.1'
+  - '@typescript-eslint/visitor-keys@8.70.1'
+  - typescript-eslint@8.70.1
+  - dotenv@18.0.2
+  - drizzle-kit@0.31.11
+  - drizzle-orm@0.45.3
+  - '@orpc/interop@1.15.3'
+  - '@orpc/json-schema@1.15.3'
+  - '@orpc/nest@1.15.3'
+  - '@orpc/openapi-client@1.15.3'
+  - '@orpc/openapi@1.15.3'
+  - '@orpc/server@1.15.3'
+  - '@orpc/standard-server-aws-lambda@1.15.3'
+  - '@orpc/standard-server-fastify@1.15.3'
+  - '@orpc/standard-server-node@1.15.3'
+  - '@orpc/zod@1.15.3'
+  - '@sentry/core@10.75.1'
+  - '@sentry/nestjs@10.75.1'
+  - '@sentry/node-core@10.75.1'
+  - '@sentry/node@10.75.1'
+  - '@sentry/opentelemetry@10.75.1'
+  - '@sentry/server-utils@10.75.1'
+  - unplugin-swc@2.0.0
+  - '@orpc/tanstack-query@1.15.3'
+  - '@tanstack/query-core@5.103.2'
+  - '@tanstack/react-query@5.103.2'
+  - '@sentry/browser-utils@10.75.1'
+  - '@sentry/browser@10.75.1'
+  - '@sentry/feedback@10.75.1'
+  - '@sentry/nextjs@10.75.1'
+  - '@sentry/react@10.75.1'
+  - '@sentry/replay-canvas@10.75.1'
+  - '@sentry/replay@10.75.1'
+  - '@sentry/vercel-edge@10.75.1'
+  - '@aws-sdk/client-s3@3.1137.0'
+  - '@aws-sdk/s3-request-presigner@3.1137.0'

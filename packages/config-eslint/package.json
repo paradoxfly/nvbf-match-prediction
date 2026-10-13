@@ -1,0 +1,18 @@
+{
+  "name": "@predict/config-eslint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.js",
+    "./nest": "./nest.js"
+  },
+  "dependencies": {
+    "@eslint/js": "catalog:",
+    "globals": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

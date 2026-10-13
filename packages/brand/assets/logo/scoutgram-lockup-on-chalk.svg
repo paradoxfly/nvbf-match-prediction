@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="1520" height="400">
+  <rect width="760" height="200" fill="#FFFFFF"></rect>
+  
+  <g transform="translate(20, 40)">
+    <rect x="6" y="6" width="108" height="108" rx="32" fill="#0A0A0A"></rect>
+    <path d="M34 42 C34 32, 44 26, 58 26 C72 26, 82 32, 82 42 C82 52, 72 56, 58 60 C44 64, 34 68, 34 78 C34 88, 44 94, 58 94 C72 94, 86 88, 92 80" stroke="#FFD400" stroke-width="10" stroke-linecap="round" fill="none"></path>
+    <circle cx="34" cy="42" r="6" fill="#FFD400"></circle>
+    <circle cx="92" cy="80" r="8" fill="#FFD400"></circle>
+    <circle cx="92" cy="80" r="3" fill="#0A0A0A"></circle>
+  </g>
+  
+  <text x="160" y="130" font-family="Hanken Grotesk, -apple-system, Segoe UI, Arial, sans-serif" font-weight="900" font-size="108" letter-spacing="-4" fill="#0A0A0A">scoutgram</text>
+  <circle cx="705" cy="98" r="7" fill="#FFD400"></circle>
+</svg>

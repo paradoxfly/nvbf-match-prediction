@@ -1,0 +1,67 @@
+/*
+ * Shared Tailwind 4 theme for web and admin. Apps import it from their globals.css:
+ *   @import "tailwindcss";
+ *   @import "@predict/ui/styles.css";
+ *   @source "../../../packages/ui/src";
+ */
+@import '@predict/brand/tokens.css';
+
+@theme inline {
+  /* Brand palette (BRAND.md §3) */
+  --color-sg-night: var(--sg-night);
+  --color-sg-flash: var(--sg-flash);
+  --color-sg-chalk: var(--sg-chalk);
+  --color-sg-ink: var(--sg-ink);
+  --color-sg-mute: var(--sg-mute);
+  --color-sg-surface: var(--sg-surface);
+
+  /* Semantic tokens used by components */
+  --color-background: var(--sg-chalk);
+  --color-foreground: var(--sg-ink);
+  --color-card: var(--sg-chalk);
+  --color-card-foreground: var(--sg-ink);
+  --color-popover: var(--sg-chalk);
+  --color-popover-foreground: var(--sg-ink);
+  --color-primary: var(--sg-night);
+  --color-primary-foreground: var(--sg-flash);
+  --color-secondary: var(--sg-surface);
+  --color-secondary-foreground: var(--sg-ink);
+  --color-muted: var(--sg-surface);
+  --color-muted-foreground: var(--sg-mute);
+  --color-accent: var(--sg-flash);
+  --color-accent-foreground: var(--sg-night);
+  --color-destructive: var(--sg-danger);
+  --color-success: var(--sg-success);
+  --color-border: var(--sg-surface);
+  --color-input: var(--sg-surface);
+  --color-ring: var(--sg-flash);
+
+  /* Fonts are loaded by each app with next/font and exposed as these variables */
+  --font-sans: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Radius scale (BRAND.md §6) */
+  --radius-sm: var(--sg-radius-sm);
+  --radius-md: var(--sg-radius-md);
+  --radius-lg: var(--sg-radius-md);
+  --radius-xl: 1.25rem;
+  --radius-2xl: var(--sg-radius-lg);
+
+  --shadow-card: var(--sg-shadow-card);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    font-family: var(--font-sans);
+    /* No dark theme yet: keep native controls light and never let a dark canvas show through. */
+    color-scheme: light;
+    background-color: var(--color-background);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}

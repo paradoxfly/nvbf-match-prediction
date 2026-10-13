@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      # Real Postgres for the concurrency suite (PGlite runs everything else in-process).
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: predict
+          POSTGRES_PASSWORD: predict
+          POSTGRES_DB: predict_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U predict"
+          --health-interval 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint, typecheck, test, build
+        run: pnpm turbo run lint typecheck test build
+
+      - name: Concurrency tests (real Postgres)
+        run: pnpm test:pg
+        env:
+          TEST_DATABASE_URL: postgres://predict:predict@localhost:5432/predict_test
+
+      - name: Migrations match schema
+        # Fails if the Drizzle schema changed without a generated migration.
+        run: |
+          pnpm --filter @predict/db exec drizzle-kit generate --name ci-check
+          git diff --exit-code --stat -- packages/db/migrations
+          test -z "$(git status --porcelain -- packages/db/migrations)"
+        env:
+          DATABASE_URL: postgres://unused@localhost/unused

@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+@import '@predict/ui/styles.css';
+
+@source "../../../../packages/ui/src";

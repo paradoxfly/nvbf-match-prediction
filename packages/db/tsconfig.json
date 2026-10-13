@@ -1,0 +1,5 @@
+{
+  "extends": "@predict/config-typescript/library.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src", "drizzle.config.ts"]
+}

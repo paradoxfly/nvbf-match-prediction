@@ -1,0 +1,18 @@
+/* Scoutgram "Floodlight" tokens (BRAND.md §8). Keep in sync with src/index.ts. */
+:root {
+  --sg-night: #0a0a0a;
+  --sg-flash: #ffd400;
+  --sg-chalk: #ffffff;
+  --sg-ink: #0a0a0a;
+  --sg-mute: #666666;
+  --sg-surface: #efefef;
+  --sg-danger: #dc2626;
+  --sg-success: #15803d;
+
+  --sg-radius-sm: 8px;
+  --sg-radius-md: 16px;
+  --sg-radius-lg: 28px;
+  --sg-radius-pill: 999px;
+
+  --sg-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
+}

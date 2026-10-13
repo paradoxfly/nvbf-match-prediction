@@ -1,0 +1,23 @@
+# Images build from source: never send local installs, builds or secrets to the daemon.
+**/node_modules
+**/dist
+**/.next
+**/out
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+.env
+.env.*
+!.env.example
+
+**/.dev-mail
+**/.storage
+**/*.log
+**/.DS_Store
+
+.git
+.github
+.vscode
+.claude

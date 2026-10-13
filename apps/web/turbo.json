@@ -1,0 +1,8 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // next build wipes .next while next typegen writes there, so run them one after the other.
+    "typecheck": { "dependsOn": ["^build", "build"] }
+  }
+}

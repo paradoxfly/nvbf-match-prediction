@@ -1,0 +1,4 @@
+{
+  "extends": "@predict/config-typescript/react-library.json",
+  "include": ["src"]
+}
