@@ -6,9 +6,9 @@ import { Alert } from '@predict/ui/alert';
 import { Button } from '@predict/ui/button';
 import { Field } from '@predict/ui/field';
 import { Input } from '@predict/ui/input';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -183,18 +183,12 @@ function CodeStep({
 }
 
 function ProfileStep({ signupTicket, onDone }: { signupTicket: string; onDone: () => void }) {
-  const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof ProfileForm>>({
     resolver: zodResolver(ProfileForm),
     defaultValues: { displayName: '', phone: '', confirmAdult: false, acceptTerms: false },
   });
   const complete = useMutation(
-    api.auth.completeSignup.mutationOptions({
-      onSuccess: (session) => {
-        queryClient.setQueryData(api.auth.session.queryKey(), session);
-        onDone();
-      },
-    }),
+    api.auth.completeSignup.mutationOptions({ onSuccess: () => onDone() }),
   );
   const { errors } = form.formState;
 
@@ -290,12 +284,13 @@ function ProfileStep({ signupTicket, onDone }: { signupTicket: string; onDone: (
 }
 
 function SignInFlow() {
-  const router = useRouter();
   const params = useSearchParams();
-  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>({ name: 'email' });
   const next = safeNextPath(params.get('next'), '/play');
-  const done = () => router.replace(next);
+  // A full page load, like a refresh: the signed-in site starts fresh with the new session
+  // cookies. A client-side navigation here left players stuck on this page on the live site
+  // until they refreshed.
+  const done = () => window.location.replace(next);
 
   if (step.name === 'email') {
     return (
@@ -336,7 +331,6 @@ function SignInFlow() {
             if (outcome.status === 'needs_profile') {
               setStep({ name: 'profile', email: step.email, signupTicket: outcome.signupTicket });
             } else {
-              void queryClient.invalidateQueries({ queryKey: api.auth.session.queryKey() });
               done();
             }
           }}
