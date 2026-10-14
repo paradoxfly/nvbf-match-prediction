@@ -48,7 +48,7 @@ For whoever runs the contest day to day and deploys it. Product rules are in [DE
 1. **Settings:** enter the bank account players pay into. Only super admins can change it, every change is logged, and each day keeps the account it opened with.
 2. **Teams:** add every men's and women's team with its logo (square PNG/JPG, at most 5 MB).
 3. **New league:** set the dates and when jackpot predictions close. Choose carefully: once the first player submits a prediction, the deadline can't be changed.
-   - **Default settings:** check the entry fee (₦500), prize %, jackpot % and prize split.
+   - **Default settings:** check the entry fee (₦1,000), prize %, jackpot % and prize split.
    - **Teams:** tick the teams taking part.
    - **Fixtures:** paste or upload the CSV (`date,time,category,home,away,venue`). Press **Check**, fix any red lines, then **Import**. Missing days are created for you. Leave rest days out.
    - **Start league:** this opens jackpot predictions.

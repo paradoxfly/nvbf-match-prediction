@@ -29,7 +29,7 @@ const QUESTIONS: Question[] = [
         <p>
           Open today&apos;s matches under <Link href="/play">Play</Link>, pick every match and tap
           Save. Then pay the entry fee by bank transfer. The fee is shown on each day (usually
-          ₦500).
+          ₦1,000).
         </p>
       </>
     ),

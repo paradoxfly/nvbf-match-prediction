@@ -1,7 +1,7 @@
 import { entries, ledgerEntries, matchDays, sql } from '@predict/db';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { adminClient } from '../support/admin';
-import { openContest, transfer } from '../support/contest';
+import { ENTRY_FEE_KOBO, openContest, transfer } from '../support/contest';
 import { createTestApp, type TestApp } from '../support/test-app';
 
 // Races that only a real, multi-connection Postgres can reproduce (PGlite serialises
@@ -114,7 +114,7 @@ describe.skipIf(!databaseUrl)('concurrency on real Postgres', () => {
     // Every confirmation either landed before the freeze (and is counted) or was refused after it.
     expect(day!.status).toBe('finalized');
     expect(day!.finalConfirmedCount).toBe(confirmed.length);
-    expect(day!.finalRevenueKobo).toBe(confirmed.length * 50_000);
+    expect(day!.finalRevenueKobo).toBe(confirmed.length * ENTRY_FEE_KOBO);
   });
 
   it('a pick saved while the day closes only counts if it landed before the close', async () => {

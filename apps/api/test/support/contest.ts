@@ -1,8 +1,12 @@
+import { DEFAULT_DAY_CONFIG } from '@predict/contracts';
 import { addDays, watDate } from '@predict/domain';
 import { adminClient } from './admin';
 import type { TestApp } from './test-app';
 
 type Agent = ReturnType<TestApp['client']>;
+
+/** ₦500. Fixed so the amounts tests expect don't move when the default entry fee changes. */
+export const ENTRY_FEE_KOBO = 50_000;
 
 export const COLLECTION_ACCOUNT = {
   bankName: 'Test Bank',
@@ -60,6 +64,7 @@ export async function openContest(
       endDate: watDay(14),
       jackpotEntryClosesOn: watDay(3),
       jackpotEntryClosesAt: '18:00',
+      defaults: { ...DEFAULT_DAY_CONFIG, entryFeeKobo: ENTRY_FEE_KOBO },
     })
     .expect(200);
   const leagueId = league.body.id as string;
@@ -103,7 +108,7 @@ export function transfer(
 ) {
   return {
     bankReference: overrides.bankReference ?? `NIP${Math.random().toString(36).slice(2, 12)}`,
-    amountKobo: overrides.amountKobo ?? 50_000,
+    amountKobo: overrides.amountKobo ?? ENTRY_FEE_KOBO,
     creditedAt: (overrides.creditedAt ?? new Date()).toISOString(),
     senderName: overrides.senderName ?? 'ADA OBI',
   };

@@ -4,7 +4,7 @@ The PRD (`daily_volleyball_prediction_contest_prd.md`) is the base. Where this f
 
 ## Owner amendments
 
-- **Entry fee:** admins can change it. The default is ₦500.
+- **Entry fee:** admins can change it. The default is ₦1,000. (Owner, 14 Oct 2026: raised from ₦500.)
 - **Sign-in:** players use their email address and an emailed 6-digit code; there is no password. They also give a Nigerian mobile number at sign-up: it must be unique across accounts, but it isn't verified. (Owner, 13 Oct 2026: SMS sender IDs take too long to approve. SMS sign-in is in git history at commit `8afff1e` if it's wanted later.)
 - **Claiming prizes:** winners claim by adding their bank details.
 - **Product name:** not decided yet. It lives in `packages/brand` (`product`), and the app is deployed under scoutgram.africa.

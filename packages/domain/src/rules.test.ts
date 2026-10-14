@@ -89,7 +89,7 @@ describe('buildRules', () => {
       id: 'how-it-works',
       snippets: [
         'Volley Predict',
-        'Pay ₦500 once',
+        'Pay ₦1,000 once',
         'points in every set',
         "Men's and women's",
         'top 10',
@@ -102,7 +102,7 @@ describe('buildRules', () => {
         'payment reference',
         'had not started when your money reached our account',
         'we refund it',
-        'exactly ₦500',
+        'exactly ₦1,000',
       ],
     },
     {
@@ -209,7 +209,7 @@ describe('buildRules', () => {
       );
       expect(text).toContain('10% of the prize money goes to the league jackpot');
       expect(text).toContain(
-        "From each ₦500 entry, ₦360 goes to the day's prizes, ₦40 to the league jackpot and ₦100 to running the game.",
+        "From each ₦1,000 entry, ₦720 goes to the day's prizes, ₦80 to the league jackpot and ₦200 to running the game.",
       );
       expect(text).toContain('the unused share is shared among the places that have winners');
       expect(text).toContain('exact kobo');
@@ -227,10 +227,10 @@ describe('buildRules', () => {
       ]);
       expect(section?.example?.lines).toEqual(
         expect.arrayContaining([
-          'Entry fees: 100 × ₦500 = ₦50,000.',
-          'Prize pool for the day: ₦36,000.',
-          '1st place: ₦14,400.',
-          '10th place: ₦900.',
+          'Entry fees: 100 × ₦1,000 = ₦100,000.',
+          'Prize pool for the day: ₦72,000.',
+          '1st place: ₦28,800.',
+          '10th place: ₦1,800.',
         ]),
       );
     });

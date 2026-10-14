@@ -67,8 +67,8 @@ describe('constants', () => {
     expect(validatePrizeTiers(DEFAULT_PRIZE_TIERS_BPS)).toEqual([]);
   });
 
-  it('default entry fee is ₦500', () => {
-    expect(formatNaira(DEFAULT_ENTRY_FEE_KOBO)).toBe('₦500');
+  it('default entry fee is ₦1,000', () => {
+    expect(formatNaira(DEFAULT_ENTRY_FEE_KOBO)).toBe('₦1,000');
   });
 });
 
@@ -131,27 +131,27 @@ describe('computePool', () => {
 
   it.each<{ name: string; input: PoolInput; expected: Record<string, number> }>([
     {
-      name: '100 entries at ₦500',
+      name: '100 entries at ₦1,000',
       input: defaults,
       expected: {
-        revenueKobo: 5_000_000,
-        participantShareKobo: 4_000_000,
-        jackpotCutKobo: 400_000,
+        revenueKobo: 10_000_000,
+        participantShareKobo: 8_000_000,
+        jackpotCutKobo: 800_000,
         contributionsKobo: 0,
-        dailyPoolKobo: 3_600_000,
-        operationsKobo: 1_000_000,
+        dailyPoolKobo: 7_200_000,
+        operationsKobo: 2_000_000,
       },
     },
     {
       name: 'sponsor money goes straight into the daily pool',
       input: { ...defaults, contributionsKobo: 250_000 },
       expected: {
-        revenueKobo: 5_000_000,
-        participantShareKobo: 4_000_000,
-        jackpotCutKobo: 400_000,
+        revenueKobo: 10_000_000,
+        participantShareKobo: 8_000_000,
+        jackpotCutKobo: 800_000,
         contributionsKobo: 250_000,
-        dailyPoolKobo: 3_850_000,
-        operationsKobo: 1_000_000,
+        dailyPoolKobo: 7_450_000,
+        operationsKobo: 2_000_000,
       },
     },
     {
@@ -182,11 +182,11 @@ describe('computePool', () => {
       name: 'all fees to prizes, no jackpot',
       input: { ...defaults, prizeBps: BPS, jackpotBps: 0 },
       expected: {
-        revenueKobo: 5_000_000,
-        participantShareKobo: 5_000_000,
+        revenueKobo: 10_000_000,
+        participantShareKobo: 10_000_000,
         jackpotCutKobo: 0,
         contributionsKobo: 0,
-        dailyPoolKobo: 5_000_000,
+        dailyPoolKobo: 10_000_000,
         operationsKobo: 0,
       },
     },

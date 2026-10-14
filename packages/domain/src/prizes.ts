@@ -10,8 +10,8 @@ export const DEFAULT_PRIZE_BPS = 8000;
 export const DEFAULT_JACKPOT_BPS = 1000;
 /** Top 10 split: 40%, 20%, 12.5%, 7.5%, 5%, 4%, 3%, 3%, 2.5%, 2.5%. */
 export const DEFAULT_PRIZE_TIERS_BPS = [4000, 2000, 1250, 750, 500, 400, 300, 300, 250, 250];
-/** ₦500. */
-export const DEFAULT_ENTRY_FEE_KOBO = 50_000;
+/** ₦1,000. */
+export const DEFAULT_ENTRY_FEE_KOBO = 100_000;
 /** Most prize places a day can have. */
 export const MAX_PRIZE_PLACES = 100;
 
