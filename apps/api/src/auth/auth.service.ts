@@ -142,15 +142,19 @@ export class AuthService {
         .returning({ id: users.id });
       return this.signIn(created!.id, meta);
     } catch (error) {
-      if (isUniqueViolation(error, 'displayName')) throw new DomainError('DISPLAY_NAME_TAKEN');
-      if (!isUniqueViolation(error, 'email')) {
-        if (isUniqueViolation(error, 'phone')) throw new DomainError('PHONE_TAKEN');
-        throw error;
-      }
-      // Double submit: the account now exists, so just sign in.
+      if (!isUniqueViolation(error)) throw error;
+      // A repeat of a submit that already worked (a double tap, or tapping again while the page
+      // moves on) collides with the account it created on every unique column, and Postgres
+      // reports whichever it checks first: usually the phone. So look for that account before
+      // blaming the phone or the name. The ticket proves this email is theirs: sign them in.
       const [existing] = await this.db.select().from(users).where(eq(users.email, email));
-      if (!existing || existing.status !== 'active') throw new DomainError('TICKET_EXPIRED');
-      return this.signIn(existing.id, meta);
+      if (existing) {
+        if (existing.status !== 'active') throw new DomainError('TICKET_EXPIRED');
+        return this.signIn(existing.id, meta);
+      }
+      if (isUniqueViolation(error, 'displayName')) throw new DomainError('DISPLAY_NAME_TAKEN');
+      if (isUniqueViolation(error, 'phone')) throw new DomainError('PHONE_TAKEN');
+      throw error;
     }
   }
 

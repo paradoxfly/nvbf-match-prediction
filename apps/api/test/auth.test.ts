@@ -83,6 +83,17 @@ describe('player sign-in (email code, phone collected)', () => {
     await other.get('/v1/auth/session').expect(200);
   });
 
+  it('signs a repeated submit into the account the first one created', async () => {
+    const { agent, ticket } = await verified();
+    const first = await agent.post('/v1/auth/signup/complete').send(profile(ticket)).expect(200);
+    // Same request again (a double tap, or a second tap while the page moves on): it collides
+    // with the new account on the phone first, but it's the same person, so they're signed in.
+    const again = await t.client().post('/v1/auth/signup/complete').send(profile(ticket));
+    expect(again.status).toBe(200);
+    expect(again.body.user.id).toBe(first.body.user.id);
+    expect((await t.db.select().from(users)).length).toBe(1);
+  });
+
   it('collects a valid phone number that no other account uses', async () => {
     await t.player(PHONE, 'First Player');
     const { agent, ticket } = await verified('bayo@example.com');

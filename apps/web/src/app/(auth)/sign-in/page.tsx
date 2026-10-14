@@ -150,13 +150,15 @@ function CodeStep({
             onChange: (event: { target: { value: string } }) => {
               const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
               form.setValue('code', digits);
-              if (digits.length === 6 && !verify.isPending) void submit();
+              if (digits.length === 6 && !verify.isPending && !verify.isSuccess) void submit();
             },
           })}
         />
       </Field>
-      <Button type="submit" size="lg" disabled={verify.isPending}>
-        {verify.isPending ? 'Checking…' : 'Continue'}
+      {/* After a sign-in, stay disabled while the next page loads: a second tap would resend a
+          code that's already used. */}
+      <Button type="submit" size="lg" disabled={verify.isPending || verify.isSuccess}>
+        {verify.isPending ? 'Checking…' : verify.isSuccess ? 'Signing you in…' : 'Continue'}
       </Button>
       <div className="flex items-center justify-between text-sm">
         <button
@@ -275,8 +277,13 @@ function ProfileStep({ signupTicket, onDone }: { signupTicket: string; onDone: (
           ) : null}
         </span>
       </label>
-      <Button type="submit" size="lg" disabled={complete.isPending}>
-        {complete.isPending ? 'Creating your account…' : 'Start playing'}
+      {/* Stay disabled while the next page loads, so nobody taps again thinking it didn't work. */}
+      <Button type="submit" size="lg" disabled={complete.isPending || complete.isSuccess}>
+        {complete.isPending
+          ? 'Creating your account…'
+          : complete.isSuccess
+            ? 'Signing you in…'
+            : 'Start playing'}
       </Button>
     </form>
   );
