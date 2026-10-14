@@ -19,8 +19,8 @@ const mono = JetBrains_Mono({
 });
 
 const DESCRIPTION =
-  'Predict every volleyball match of the day — the set score and the points in every set. ' +
-  'Pay once a day, climb the leaderboard and win cash. Plus a league jackpot for the final table.';
+  "You sabi volleyball? Predict today's matches, call the set scores and climb the leaderboard. " +
+  'Pay once a day and win cash. Big league jackpot dey too.';
 
 export const metadata: Metadata = {
   // Makes every relative URL below (and each page's link preview image) absolute.
