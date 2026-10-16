@@ -9,11 +9,12 @@ import { Field } from '@predict/ui/field';
 import { Input } from '@predict/ui/input';
 import { Select } from '@predict/ui/select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
-import { koboToNairaText } from '@/lib/format';
+import { formatMoment, formatNaira, koboToNairaText } from '@/lib/format';
 import type { EntryData } from '@/lib/types';
 
 /** Ten minutes of grace for phones whose clock runs a little fast. */
@@ -45,6 +46,15 @@ const ClaimSchema = z.object({
 });
 type ClaimValues = z.infer<typeof ClaimSchema>;
 
+/** "₦1,000 at 12:05pm" from the form's own fields, or null while they don't make sense. */
+function sentSummary(amount: string, paidDate: string, paidTime: string): string | null {
+  try {
+    return `${formatNaira(nairaToKobo(amount))} at ${formatMoment(watToUtc(paidDate, paidTime))}`;
+  } catch {
+    return null;
+  }
+}
+
 /** "I've sent it": details that help us find the transfer in our statement. */
 export function ClaimForm({
   entry,
@@ -73,6 +83,15 @@ export function ClaimForm({
     },
   });
   const { errors } = form.formState;
+  const [amount, paidDate, paidTime] = useWatch({
+    control: form.control,
+    name: ['amount', 'paidDate', 'paidTime'],
+  });
+  // Amount and time start right (the fee, just now), so they stay folded until asked for.
+  const [changingSent, setChangingSent] = useState(false);
+  const summary = sentSummary(amount, paidDate, paidTime);
+  const showSent =
+    changingSent || !summary || Boolean(errors.amount || errors.paidDate || errors.paidTime);
 
   const submit = useMutation(
     api.entries.submitClaim.mutationOptions({
@@ -122,17 +141,30 @@ export function ClaimForm({
           ))}
         </Select>
       </Field>
-      <Field label="Amount sent (₦)" error={errors.amount?.message}>
-        <Input inputMode="decimal" autoComplete="off" {...form.register('amount')} />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Day you paid" error={errors.paidDate?.message}>
-          <Input type="date" {...form.register('paidDate')} />
-        </Field>
-        <Field label="Time (Lagos)" error={errors.paidTime?.message}>
-          <Input type="time" {...form.register('paidTime')} />
-        </Field>
-      </div>
+      {showSent ? (
+        <>
+          <Field label="Amount sent (₦)" error={errors.amount?.message}>
+            <Input inputMode="decimal" autoComplete="off" {...form.register('amount')} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Day you paid" error={errors.paidDate?.message}>
+              <Input type="date" {...form.register('paidDate')} />
+            </Field>
+            <Field label="Time (Lagos)" error={errors.paidTime?.message}>
+              <Input type="time" {...form.register('paidTime')} />
+            </Field>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-between gap-3 rounded-sm bg-muted px-3 py-2">
+          <p className="text-sm">
+            You sent <span className="font-bold">{summary}</span>
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setChangingSent(true)}>
+            Change
+          </Button>
+        </div>
+      )}
       <Field
         label="Transfer reference (optional)"
         hint="The session ID or reference from your bank's receipt, if you have it."
@@ -141,7 +173,7 @@ export function ClaimForm({
         <Input autoComplete="off" {...form.register('transferReference')} />
       </Field>
       <Button type="submit" size="lg" disabled={submit.isPending}>
-        {submit.isPending ? 'Sending…' : "I've sent it"}
+        {submit.isPending ? 'Sending…' : 'Send details'}
       </Button>
     </form>
   );

@@ -5,10 +5,17 @@ import { Alert } from '@predict/ui/alert';
 import { Button } from '@predict/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@predict/ui/card';
 import { EmptyState } from '@predict/ui/states';
+import { cn } from '@predict/ui/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, CalendarXIcon, CircleCheckIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CalendarXIcon,
+  CircleCheckIcon,
+  HourglassIcon,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { QueryError } from '@/components/query-error';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,10 +70,6 @@ function AccountDetails({ account }: { account: CollectionAccountData }) {
   ];
   return (
     <Card>
-      <CardHeader>
-        <Kicker>to this account</Kicker>
-        <CardTitle>Bank transfer details</CardTitle>
-      </CardHeader>
       <dl className="flex flex-col divide-y divide-border">
         {rows.map((row) => (
           <div
@@ -84,37 +87,6 @@ function AccountDetails({ account }: { account: CollectionAccountData }) {
         ))}
       </dl>
     </Card>
-  );
-}
-
-function HowToPay({ entry }: { entry: EntryData }) {
-  const fee = formatNaira(entry.feeKobo);
-  const steps = [
-    `Open your bank app and send exactly ${fee} to the account above.`,
-    `Type your reference ${entry.paymentReference} in the description (narration).`,
-    'Tap "I\'ve sent it" below and tell us who sent it, so we find it faster.',
-    'We confirm it once the money reaches our account, and your entry shows as confirmed.',
-  ];
-  return (
-    <section aria-labelledby="how-to-pay" className="flex flex-col gap-3">
-      <h2 id="how-to-pay" className="text-lg font-extrabold">
-        how to pay
-      </h2>
-      <ol className="flex flex-col gap-2.5">
-        {steps.map((step, index) => (
-          <li key={index} className="flex gap-3 text-sm">
-            <span
-              aria-hidden
-              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-xs font-bold"
-            >
-              {index + 1}
-            </span>
-            <span className="pt-0.5">{step}</span>
-          </li>
-        ))}
-      </ol>
-      <Alert>{FAIRNESS_NOTE}</Alert>
-    </section>
   );
 }
 
@@ -142,52 +114,237 @@ function ClaimSummary({ entry }: { entry: EntryData }) {
   );
 }
 
-function ClaimSection({ entry, date, now }: { entry: EntryData; date: string; now: number }) {
+type PayStep = 'account' | 'send' | 'claim';
+type PayView = PayStep | 'review';
+
+const PAY_STEPS: { key: PayStep; label: string }[] = [
+  { key: 'account', label: 'Bank details' },
+  { key: 'send', label: 'Send money' },
+  { key: 'claim', label: 'Tell us' },
+];
+
+function StepProgress({ current }: { current: PayStep }) {
+  const index = PAY_STEPS.findIndex((step) => step.key === current);
+  return (
+    <ol aria-label="Payment steps" className="grid grid-cols-3 gap-2">
+      {PAY_STEPS.map((step, position) => (
+        <li
+          key={step.key}
+          aria-current={position === index ? 'step' : undefined}
+          className="flex flex-col gap-1.5"
+        >
+          <span
+            aria-hidden
+            className={cn(
+              'h-1.5 rounded-full',
+              position <= index ? 'bg-sg-night' : 'bg-sg-night/15',
+            )}
+          />
+          <span className={cn('text-xs font-bold', position > index && 'text-muted-foreground')}>
+            {position + 1}. {step.label}
+            {position < index ? <span className="sr-only"> (done)</span> : null}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** One payment step: where the player is, what to do, and the way on (or back). */
+function StepFrame({
+  step,
+  title,
+  headingRef,
+  onBack,
+  children,
+  next,
+}: {
+  step: PayStep;
+  title: string;
+  headingRef: Ref<HTMLHeadingElement>;
+  onBack?: () => void;
+  children: ReactNode;
+  next?: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="flex max-w-xl flex-col gap-4">
+      <StepProgress current={step} />
+      <div className="flex items-center justify-between gap-3">
+        <h2
+          id={headingId}
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-xl leading-tight font-extrabold tracking-[-0.5px] outline-none"
+        >
+          {title}
+        </h2>
+        {onBack ? (
+          <Button type="button" variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeftIcon aria-hidden />
+            Back
+          </Button>
+        ) : null}
+      </div>
+      {children}
+      {next}
+    </section>
+  );
+}
+
+function CheckingPayment({
+  entry,
+  onUpdate,
+  onShowDetails,
+}: {
+  entry: EntryData;
+  onUpdate: () => void;
+  onShowDetails: () => void;
+}) {
+  return (
+    <Card className="max-w-xl">
+      <div className="flex items-start gap-3">
+        <HourglassIcon aria-hidden className="mt-0.5 size-6 shrink-0" />
+        <div>
+          <h2 className="font-extrabold">We&apos;re checking your payment</h2>
+          <p className="text-sm text-muted-foreground">
+            We confirm it as soon as we find the money in our account. This page updates by itself.
+          </p>
+        </div>
+      </div>
+      <ClaimSummary entry={entry} />
+      <PaymentTimeline entry={entry} />
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" onClick={onUpdate}>
+          Update details
+        </Button>
+        <Button type="button" variant="ghost" onClick={onShowDetails}>
+          See bank details
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Paying, one screen at a time: our account, the amount and reference, then "I've sent it". */
+function PayFlow({
+  entry,
+  account,
+  date,
+  now,
+  canClaim,
+}: {
+  entry: EntryData;
+  account: CollectionAccountData | null;
+  date: string;
+  now: number;
+  canClaim: boolean;
+}) {
   const pending = entry.status === 'payment_review' && entry.latestClaim?.status === 'pending';
-  const [editing, setEditing] = useState(!pending);
-  const [sent, setSent] = useState(false);
+  const rejected = entry.latestClaim?.status === 'rejected' ? entry.latestClaim : null;
+  const [chosen, setChosen] = useState<PayView>(
+    pending ? 'review' : rejected ? 'claim' : 'account',
+  );
+  // Details turned down while the player waited: back to the form to send them again.
+  const view: PayView = chosen === 'review' && !pending ? 'claim' : chosen;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const moved = useRef(false);
+  const fee = formatNaira(entry.feeKobo);
+
+  // Each step starts at the top of the page, with focus on its heading.
+  useEffect(() => {
+    if (!moved.current) return;
+    window.scrollTo({ top: 0 });
+    headingRef.current?.focus({ preventScroll: true });
+  }, [view]);
+
+  function go(next: PayView) {
+    moved.current = true;
+    setChosen(next);
+  }
+
+  if (view === 'review') {
+    return (
+      <CheckingPayment
+        entry={entry}
+        onUpdate={() => go('claim')}
+        onShowDetails={() => go('account')}
+      />
+    );
+  }
+
+  if (view === 'account') {
+    return (
+      <StepFrame
+        step="account"
+        title="Send to this account"
+        headingRef={headingRef}
+        next={
+          account ? (
+            <Button size="lg" className="sm:self-start" onClick={() => go('send')}>
+              Next: amount and reference
+              <ArrowRightIcon aria-hidden />
+            </Button>
+          ) : null
+        }
+      >
+        {account ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Open your bank app and start a transfer of{' '}
+              <span className="font-bold text-foreground">{fee}</span> to this account.
+            </p>
+            <AccountDetails account={account} />
+            <p className="text-xs text-muted-foreground">{FAIRNESS_NOTE}</p>
+          </>
+        ) : (
+          <Alert>
+            Our bank details aren&apos;t ready yet. Check back shortly, or email{' '}
+            {product.supportEmail}.
+          </Alert>
+        )}
+      </StepFrame>
+    );
+  }
+
+  if (view === 'send') {
+    return (
+      <StepFrame
+        step="send"
+        title="Send the money"
+        headingRef={headingRef}
+        onBack={() => go('account')}
+        next={
+          <Button size="lg" className="sm:self-start" onClick={() => go('claim')}>
+            I&apos;ve sent it
+            <ArrowRightIcon aria-hidden />
+          </Button>
+        }
+      >
+        <AmountAndReference entry={entry} />
+      </StepFrame>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <Kicker>after you pay</Kicker>
-        <CardTitle>{pending && !editing ? "We've got your details" : "I've sent it"}</CardTitle>
-        <CardDescription>
-          {pending && !editing
-            ? "We're checking our account for your transfer."
-            : 'Tell us about your transfer so we can match it to your entry quickly.'}
-        </CardDescription>
-      </CardHeader>
-      {sent ? (
-        <Alert variant="success">Thanks! We&apos;ll confirm your payment once we find it.</Alert>
+    <StepFrame
+      step="claim"
+      title="Tell us you've sent it"
+      headingRef={headingRef}
+      onBack={() => go(pending ? 'review' : 'send')}
+    >
+      {rejected ? (
+        <Alert variant="destructive">
+          We couldn&apos;t match the payment details you sent
+          {rejected.reviewNote ? `: ${rejected.reviewNote}` : '.'} Check them and send them again.
+        </Alert>
       ) : null}
-      {pending && !editing ? (
-        <>
-          <ClaimSummary entry={entry} />
-          <Button
-            type="button"
-            variant="outline"
-            className="self-start"
-            onClick={() => {
-              setSent(false);
-              setEditing(true);
-            }}
-          >
-            Update details
-          </Button>
-        </>
+      {canClaim ? (
+        <ClaimForm entry={entry} date={date} now={now} onDone={() => go('review')} />
       ) : (
-        <ClaimForm
-          entry={entry}
-          date={date}
-          now={now}
-          onDone={() => {
-            setSent(true);
-            setEditing(false);
-          }}
-        />
+        <Alert>Entries for this day have closed.</Alert>
       )}
-    </Card>
+    </StepFrame>
   );
 }
 
@@ -255,12 +412,7 @@ function PayBoard({ data, date, offset }: { data: MyDayData; date: string; offse
   );
 
   const header = (
-    <PageHeader kicker={`${formatDay(day.date)} · entry`} title="pay to enter" actions={back}>
-      <p>
-        Pay by bank transfer. We check every payment against our bank account, then your picks
-        count.
-      </p>
-    </PageHeader>
+    <PageHeader kicker={`${formatDay(day.date)} · entry`} title="pay to enter" actions={back} />
   );
 
   if (!entry) {
@@ -321,46 +473,16 @@ function PayBoard({ data, date, offset }: { data: MyDayData; date: string; offse
     );
   }
 
-  const canClaim = day.status === 'open' || day.status === 'closed';
-  const rejected = entry.latestClaim?.status === 'rejected' ? entry.latestClaim : null;
-
   return (
     <div className="flex flex-col gap-6">
       {header}
-      {rejected ? (
-        <Alert variant="destructive">
-          We couldn&apos;t match the payment details you sent
-          {rejected.reviewNote ? `: ${rejected.reviewNote}` : '.'} Check them and send them again.
-        </Alert>
-      ) : null}
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <div className="flex flex-col gap-6">
-          <AmountAndReference entry={entry} />
-          {collectionAccount ? (
-            <AccountDetails account={collectionAccount} />
-          ) : (
-            <Alert>
-              Our bank details aren&apos;t ready yet. Check back shortly, or email{' '}
-              {product.supportEmail}.
-            </Alert>
-          )}
-          <HowToPay entry={entry} />
-        </div>
-        <div className="flex flex-col gap-6">
-          {canClaim ? (
-            <ClaimSection entry={entry} date={date} now={now} />
-          ) : (
-            <Alert>Entries for this day have closed.</Alert>
-          )}
-          <Card>
-            <CardHeader>
-              <Kicker>status</Kicker>
-              <CardTitle>Your entry</CardTitle>
-            </CardHeader>
-            <PaymentTimeline entry={entry} />
-          </Card>
-        </div>
-      </div>
+      <PayFlow
+        entry={entry}
+        account={collectionAccount}
+        date={date}
+        now={now}
+        canClaim={day.status === 'open' || day.status === 'closed'}
+      />
     </div>
   );
 }

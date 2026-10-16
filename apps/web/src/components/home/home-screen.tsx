@@ -2,18 +2,21 @@
 
 import { product } from '@predict/brand';
 import { Alert } from '@predict/ui/alert';
+import { Button } from '@predict/ui/button';
 import { EmptyState } from '@predict/ui/states';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClockIcon } from 'lucide-react';
+import { ArrowRightIcon, CalendarClockIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { FixtureList } from '@/components/fixtures';
 import { QueryError } from '@/components/query-error';
+import { useOptionalSession } from '@/components/session';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SectionTitle } from '@/components/ui/text';
 import { api } from '@/lib/api';
 import { clockOffset, useServerNow } from '@/lib/clock';
 import { formatDay, plural, watDate } from '@/lib/format';
-import type { HomeData } from '@/lib/types';
+import type { DayData, HomeData, PredictionData } from '@/lib/types';
 import { DayHero } from './day-hero';
 import { HowItWorks } from './how-it-works';
 import { JackpotCard } from './jackpot-card';
@@ -24,14 +27,30 @@ import { SponsorsStrip } from './sponsors-strip';
 function HomeSkeleton() {
   return (
     <div role="status" aria-label="Loading today's contest" className="flex flex-col gap-6">
-      <Skeleton className="h-24" />
-      <Skeleton className="h-80 rounded-2xl bg-sg-night/90" />
+      <Skeleton className="h-72 rounded-2xl bg-sg-night/90" />
+      <Skeleton className="h-64" />
       <div className="grid gap-6 md:grid-cols-2">
         <Skeleton className="h-56" />
         <Skeleton className="h-56" />
       </div>
-      <Skeleton className="h-64" />
     </div>
+  );
+}
+
+const NO_PICKS: ReadonlyMap<string, PredictionData> = new Map();
+
+/** The signed-in player's saved picks for the day, by match id (empty for visitors). */
+function useMyPicks(day: DayData | null): ReadonlyMap<string, PredictionData> {
+  const { user } = useOptionalSession();
+  const myDay = useQuery({
+    ...api.entries.myDay.queryOptions({ input: { date: day?.date ?? '' } }),
+    enabled: Boolean(user && day && day.matches.length > 0),
+    retry: false,
+  });
+  const predictions = myDay.data?.predictions;
+  return useMemo(
+    () => (predictions ? new Map(predictions.map((pick) => [pick.matchId, pick])) : NO_PICKS),
+    [predictions],
   );
 }
 
@@ -39,19 +58,13 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
   const now = useServerNow(offset);
   const today = watDate(new Date(now));
   const day = data.featured;
+  const picks = useMyPicks(day);
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8 sm:gap-10">
       <h1 className="sr-only">
         {product.name}: {data.leagueName ?? 'daily volleyball predictions'}
       </h1>
-
-      <LeagueCalendar
-        days={data.days}
-        today={today}
-        focusDate={day?.date}
-        leagueName={data.leagueName}
-      />
 
       {day ? (
         <DayHero day={day} now={now} today={today} />
@@ -63,13 +76,6 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
         />
       )}
 
-      {data.jackpot || day ? (
-        <div className="grid items-start gap-6 md:grid-cols-2">
-          {data.jackpot ? <JackpotCard jackpot={data.jackpot} now={now} /> : null}
-          {day ? <PrizeTable day={day} /> : null}
-        </div>
-      ) : null}
-
       {day && day.matches.length > 0 ? (
         <section aria-labelledby="fixtures-heading" className="flex flex-col gap-4">
           <SectionTitle
@@ -78,18 +84,32 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
             kicker={plural(day.matches.length, 'match', 'matches')}
             action={
               day.status === 'open' ? (
-                <Link
-                  href={`/play/${day.date}`}
-                  className="font-semibold underline underline-offset-4"
-                >
-                  Make your picks
-                </Link>
+                <Button asChild>
+                  <Link href={`/play/${day.date}`}>
+                    {picks.size > 0 ? 'Edit picks' : 'Predict'}
+                    <ArrowRightIcon aria-hidden />
+                  </Link>
+                </Button>
               ) : undefined
             }
           />
-          <FixtureList matches={day.matches} now={now} />
+          <FixtureList matches={day.matches} now={now} picks={picks} />
         </section>
       ) : null}
+
+      {data.jackpot || day ? (
+        <div className="grid items-start gap-6 md:grid-cols-2">
+          {data.jackpot ? <JackpotCard jackpot={data.jackpot} now={now} /> : null}
+          {day ? <PrizeTable day={day} /> : null}
+        </div>
+      ) : null}
+
+      <LeagueCalendar
+        days={data.days}
+        today={today}
+        focusDate={day?.date}
+        leagueName={data.leagueName}
+      />
 
       {day ? <SponsorsStrip sponsors={day.sponsors} /> : null}
 
@@ -102,7 +122,7 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
   );
 }
 
-/** Today's contest: the league calendar, prize pool, jackpot, prizes and fixtures. */
+/** Today's contest: the prize pool and fixtures first, then the jackpot, prizes and calendar. */
 export function HomeScreen() {
   const home = useQuery(api.public.home.queryOptions({ refetchInterval: 15_000 }));
 

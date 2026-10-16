@@ -88,10 +88,15 @@ export function DayHero({ day, now, today }: { day: DayData; now: number; today:
   const isToday = day.date === today;
   const fromEntries = Math.max(0, pool.participantShareKobo - pool.jackpotCutKobo);
 
+  const sources = [
+    `${formatNaira(fromEntries)} from entries`,
+    ...(pool.contributionsKobo > 0 ? [`${formatNaira(pool.contributionsKobo)} from sponsors`] : []),
+  ].join(' + ');
+
   return (
     <section
       aria-labelledby="pool-heading"
-      className="overflow-hidden rounded-2xl bg-sg-night p-6 text-sg-chalk sm:p-8"
+      className="overflow-hidden rounded-2xl bg-sg-night p-5 text-sg-chalk sm:p-8"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mono text-[10px] tracking-[2px] text-sg-chalk/60 uppercase">
@@ -102,18 +107,20 @@ export function DayHero({ day, now, today }: { day: DayData; now: number; today:
         </p>
       </div>
 
-      <h2 id="pool-heading" className="mt-6 text-sm font-bold text-sg-chalk/85">
+      <h2 id="pool-heading" className="mt-4 text-sm font-bold text-sg-chalk/85 sm:mt-6">
         {isToday ? "today's prize pool" : `prize pool for ${formatDay(day.date)}`}
       </h2>
       <p className="mt-1 font-mono text-[clamp(2rem,11vw,4.5rem)] leading-none font-bold tracking-[-2px] text-sg-flash">
         {formatNaira(pool.dailyPoolKobo)}
       </p>
-      <p className="mt-3 max-w-md text-xs text-sg-chalk/60">
+      <p className="mt-2 max-w-md text-xs text-sg-chalk/70">
         {day.status === 'cancelled'
           ? 'This day was cancelled. Everyone who paid gets a full refund.'
-          : pool.final
-            ? 'Prize pool confirmed.'
-            : 'Grows as payments are confirmed. Fixed once the winners are confirmed.'}
+          : `${sources}. ${
+              pool.final
+                ? 'Prize pool confirmed.'
+                : 'Grows as payments are confirmed, fixed once the winners are confirmed.'
+            }`}
       </p>
       {day.pledgedKobo > 0 ? (
         <p className="mt-1 text-xs text-sg-chalk/80">
@@ -121,14 +128,12 @@ export function DayHero({ day, now, today }: { day: DayData; now: number; today:
         </p>
       ) : null}
 
-      <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-sg-chalk/10 pt-5 sm:grid-cols-4">
+      <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t border-sg-chalk/10 pt-4 sm:mt-6 sm:pt-5">
         <HeroStat label="Paid players" value={pool.confirmedEntries.toLocaleString('en-NG')} />
         <HeroStat label="Entry fee" value={formatNaira(pool.entryFeeKobo)} />
-        <HeroStat label="From entries" value={formatNaira(fromEntries)} />
-        <HeroStat label="From sponsors" value={formatNaira(pool.contributionsKobo)} />
       </dl>
 
-      <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 sm:mt-7">
         <DayCallToAction day={day} isToday={isToday} />
         <DeadlineLine day={day} now={now} />
       </div>

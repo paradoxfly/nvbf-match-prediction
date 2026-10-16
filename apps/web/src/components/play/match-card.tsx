@@ -1,6 +1,6 @@
 'use client';
 
-import { CATEGORY_LABELS, type DayStatus } from '@predict/contracts';
+import type { DayStatus } from '@predict/contracts';
 import {
   majorOutcomes,
   scoreMatch,
@@ -15,6 +15,7 @@ import { Badge } from '@predict/ui/badge';
 import { cn } from '@predict/ui/utils';
 import { CheckIcon, ChevronDownIcon, LockIcon, Undo2Icon } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
+import { CategoryTag } from '@/components/fixtures';
 import { TeamLogo } from '@/components/team-logo';
 import { formatCountdown, formatScore, formatSets, formatTime } from '@/lib/format';
 import type { MatchData, PredictionData, TeamData } from '@/lib/types';
@@ -536,7 +537,7 @@ export function MatchCard(props: MatchCardProps) {
         >
           <span className="flex w-full items-center justify-between gap-2">
             <span className="flex items-center gap-2">
-              <Badge>{CATEGORY_LABELS[match.category]}</Badge>
+              <CategoryTag category={match.category} />
               <time dateTime={match.scheduledAt} className="font-mono text-xs font-bold">
                 {formatTime(match.scheduledAt)}
               </time>
