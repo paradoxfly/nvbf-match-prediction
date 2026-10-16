@@ -1,4 +1,5 @@
-// When predictions lock, and which predictions and payments count. Locks never reopen.
+// When predictions lock, and which predictions and payments count. A passed lock stays (kept as
+// `lockedAt` through a reschedule) unless staff reopen a match that never started.
 
 import type { DayTiming, MatchTiming } from './types';
 

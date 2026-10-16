@@ -290,6 +290,11 @@ const DAY_ERRORS = {
     message: 'Both teams must be different, in the same category and in this league.',
   },
   CLOSE_IN_PAST: { status: 400, message: 'Pick a close time in the future, or close it now.' },
+  NOT_REOPENABLE: {
+    status: 409,
+    message:
+      "Picks can only reopen for a match that hasn't started, has no result and whose start time is still ahead. Reschedule it first.",
+  },
 } as const;
 
 export const adminDaysContract = {
@@ -364,6 +369,16 @@ export const adminDaysContract = {
     .route({ method: 'POST', path: '/admin/matches/{id}/reschedule', tags: ['admin-days'] })
     .errors(DAY_ERRORS)
     .input(IdParam.extend({ time: ClockTime, reason: Reason }))
+    .output(AdminDayView),
+
+  /**
+   * Reopens picks for a match that locked but never started (e.g. postponed to later the same
+   * day): it locks again at its new start.
+   */
+  reopenMatch: oc
+    .route({ method: 'POST', path: '/admin/matches/{id}/reopen', tags: ['admin-days'] })
+    .errors(DAY_ERRORS)
+    .input(IdParam.extend({ reason: Reason }))
     .output(AdminDayView),
 };
 

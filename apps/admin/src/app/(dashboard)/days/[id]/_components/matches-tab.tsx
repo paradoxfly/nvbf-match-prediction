@@ -14,11 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@predict/ui/textarea';
 import { cn } from '@predict/ui/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Ban, CalendarClock, Lock, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { Ban, CalendarClock, Lock, LockOpen, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactElement } from 'react';
 import { can, useAdmin } from '@/components/admin-shell';
 import { WatDateTimeInput } from '@/components/inputs';
 import { QueryState } from '@/components/query-state';
+import { CheckboxField } from '@/components/ui/checkbox';
 import { MatchStatusBadge } from '@/components/status-badges';
 import { MatchTeams } from '@/components/team-logo';
 import { Callout } from '@/components/ui/callout';
@@ -41,8 +42,25 @@ export const sortMatches = (matches: DayMatch[]) =>
 export const setLine = (sets: { home: number; away: number }[]) =>
   sets.map((set) => `${set.home}–${set.away}`).join(', ');
 
+const MINUTE_MS = 60_000;
+
+/**
+ * When a locked match would lock again if its picks reopened: its start minus the lead time,
+ * capped by a scheduled close. Null when reopening can't help (the day isn't open, the match
+ * has a result, or that moment has passed). The API checks again, including a marked early start.
+ */
+function reopenUntil(day: AdminDay, match: DayMatch, now: number): number | null {
+  if (day.status !== 'open' || match.status !== 'scheduled' || !match.locked || match.result) {
+    return null;
+  }
+  let lock = new Date(match.scheduledAt).getTime() - day.config.lockLeadMin * MINUTE_MS;
+  if (day.submissionsCloseAt) lock = Math.min(lock, new Date(day.submissionsCloseAt).getTime());
+  return lock > now ? lock : null;
+}
+
 export function MatchesTab({ day }: { day: AdminDay }) {
   const admin = useAdmin();
+  const now = useNow(30_000);
   const isOps = can(admin, 'operations');
   const beforeOpen = day.status === 'draft' || day.status === 'published';
   const running = day.status === 'open' || day.status === 'closed';
@@ -60,7 +78,8 @@ export function MatchesTab({ day }: { day: AdminDay }) {
       ) : running ? (
         <p className="text-sm text-muted-foreground">
           The fixture list is fixed now. If a match starts early, is called off or moves, record it
-          here: locks never reopen.
+          here. A match that locked but was postponed to later today can have its picks reopened
+          once it&apos;s rescheduled.
         </p>
       ) : null}
 
@@ -89,6 +108,7 @@ export function MatchesTab({ day }: { day: AdminDay }) {
             <TableBody>
               {matches.map((match) => {
                 const lockDiffers = match.lockAt !== match.scheduledAt;
+                const relockAt = running && isOps ? reopenUntil(day, match, now) : null;
                 return (
                   <TableRow
                     key={match.id}
@@ -160,6 +180,9 @@ export function MatchesTab({ day }: { day: AdminDay }) {
                                   <MarkStartedDialog day={day} match={match} />
                                   <RescheduleDialog day={day} match={match} />
                                 </>
+                              ) : null}
+                              {relockAt !== null ? (
+                                <ReopenPicksButton day={day} match={match} until={relockAt} />
                               ) : null}
                               <VoidMatchButton day={day} match={match} />
                               <EditMatchDialog day={day} match={match} venueOnly />
@@ -562,7 +585,7 @@ function RescheduleForm({
   return (
     <DialogForm
       title="Reschedule match"
-      description={`${match.home.name} v ${match.away.name}, same day. If its picks already locked, they stay locked.`}
+      description={`${match.home.name} v ${match.away.name}, same day. If its picks already locked, they stay locked until you reopen them.`}
       submitLabel="Save new time"
       pending={reschedule.isPending}
       canSubmit={/^\d{2}:\d{2}/.test(time) && reason.trim().length >= 3}
@@ -583,6 +606,56 @@ function RescheduleForm({
         />
       </Field>
     </DialogForm>
+  );
+}
+
+function ReopenPicksButton({
+  day,
+  match,
+  until,
+}: {
+  day: AdminDay;
+  match: DayMatch;
+  /** When picks lock again (ms). */
+  until: number;
+}) {
+  const toast = useToast();
+  const applyDay = useApplyDay(day.id);
+  const [notStarted, setNotStarted] = useState(false);
+  const reopen = useMutation(
+    api.admin.days.reopenMatch.mutationOptions({
+      onSuccess: (data) => {
+        applyDay(data);
+        toast({
+          title: 'Picks reopened',
+          description: `They lock again at ${formatTime(new Date(until))}.`,
+        });
+      },
+    }),
+  );
+  return (
+    <ConfirmAction
+      trigger={
+        <Button variant="outline" size="sm">
+          <LockOpen aria-hidden />
+          Reopen picks
+        </Button>
+      }
+      title="Reopen picks for this match?"
+      description={`${match.home.name} v ${match.away.name} is now at ${formatTime(match.scheduledAt)}. Players can pick it again until ${formatTime(new Date(until))}, and payments that arrive before then count for it.`}
+      confirmLabel="Reopen picks"
+      pendingLabel="Reopening…"
+      reason={{ placeholder: 'e.g. Postponed from 12:00 by the federation; not started.' }}
+      confirmDisabled={!notStarted}
+      onConfirm={(reason) => reopen.mutateAsync({ id: match.id, reason })}
+    >
+      <CheckboxField
+        label="This match hasn't started"
+        description="Only reopen a match nobody has seen any of yet."
+        checked={notStarted}
+        onCheckedChange={setNotStarted}
+      />
+    </ConfirmAction>
   );
 }
 

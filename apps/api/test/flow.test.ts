@@ -1,7 +1,10 @@
 import {
+  auditLogs,
   entries,
+  eq,
   jackpotEntries,
   ledgerEntries,
+  matches,
   payoutObligations,
   sql,
   type Database,
@@ -282,6 +285,65 @@ describe('a full match-day', () => {
       day.body.predictions.map((p: { matchId: string; counts: boolean }) => [p.matchId, p.counts]),
     );
     expect(counts).toEqual({ [setup.matchIds[0]!]: false, [setup.matchIds[1]!]: true });
+  });
+
+  it('reopens picks for a postponed match that never started, and only for one', async () => {
+    const setup = await openContest(t);
+    const finance = await adminClient(t, 'finance');
+    const [postponed, other] = setup.matchIds as [string, string];
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+    // The match's original start passed before staff moved it, so the reschedule kept the lock.
+    await t.db
+      .update(matches)
+      .set({ lockedAt: minutesAgo(1) })
+      .where(eq(matches.id, postponed));
+    const player = await t.player('+2348031234567', 'Patient Player');
+    const save = () =>
+      player
+        .put(`/v1/me/days/${setup.date}/predictions`)
+        .send({ date: setup.date, predictions: [{ matchId: postponed, sets: RESULT_1 }] })
+        .expect(200);
+    expect((await save()).body.rejected[0]).toMatchObject({ reason: 'LOCKED' });
+
+    const reopened = await setup.admin
+      .post(`/v1/admin/matches/${postponed}/reopen`)
+      .send({ reason: 'Postponed to later today' })
+      .expect(200);
+    const view = reopened.body.matches.find((match: { id: string }) => match.id === postponed);
+    expect(view.locked).toBe(false);
+    expect((await save()).body.rejected).toEqual([]);
+
+    // Money that arrives before the new start counts for the match again.
+    const mine = await player.get(`/v1/me/days/${setup.date}`).expect(200);
+    await confirmPayment(finance, mine.body.entry.id);
+    const after = await player.get(`/v1/me/days/${setup.date}`).expect(200);
+    expect(after.body.predictions).toEqual([
+      expect.objectContaining({ matchId: postponed, counts: true }),
+    ]);
+    const audit = await t.db.select().from(auditLogs).where(eq(auditLogs.action, 'match.reopened'));
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.reason).toBe('Postponed to later today');
+
+    // A match that actually started stays locked.
+    await setup.admin
+      .post(`/v1/admin/matches/${other}/started`)
+      .send({ startedAt: minutesAgo(1).toISOString(), reason: 'Started early' })
+      .expect(200);
+    const started = await setup.admin
+      .post(`/v1/admin/matches/${other}/reopen`)
+      .send({ reason: 'Oops' });
+    expect(started.body.code).toBe('NOT_REOPENABLE');
+
+    // So does one whose start time has passed: it has to be rescheduled first.
+    await t.db
+      .update(matches)
+      .set({ scheduledAt: minutesAgo(1), lockedAt: minutesAgo(5) })
+      .where(eq(matches.id, postponed));
+    const passed = await setup.admin
+      .post(`/v1/admin/matches/${postponed}/reopen`)
+      .send({ reason: 'Oops' });
+    expect(passed.body.code).toBe('NOT_REOPENABLE');
   });
 
   it('rejects invalid picks and keeps identical re-saves from creating revisions', async () => {

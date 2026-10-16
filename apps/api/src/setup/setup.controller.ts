@@ -268,6 +268,18 @@ export class AdminDaysController {
       ),
     );
   }
+
+  @RequireRoles('operations')
+  @Implement(contract.admin.days.reopenMatch)
+  reopenMatch(@CurrentAuth() auth: AdminAuth, @ClientInfo() meta: ClientMeta) {
+    return implement(contract.admin.days.reopenMatch).handler(({ input, errors }) =>
+      orNotFound('Match', () =>
+        withContractErrors(errors, () =>
+          this.days.reopenMatch(adminActor(auth, meta), input.id, input.reason),
+        ),
+      ),
+    );
+  }
 }
 
 @Controller()

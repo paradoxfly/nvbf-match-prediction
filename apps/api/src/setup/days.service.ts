@@ -19,6 +19,8 @@ import {
   leagueTeams,
   matchDays,
   matches,
+  matchResults,
+  ne,
   sql,
   type Database,
   type Executor,
@@ -357,6 +359,42 @@ export class DaysService {
       { matchId, from: match.scheduledAt, to: time },
     );
     return this.get(match.matchDayId);
+  }
+
+  /**
+   * Reopens picks for a match whose lock was kept by a reschedule but which never started, e.g.
+   * one postponed to later the same day. It locks again at its new start. Refused once the match
+   * has started (marked early or has a result), once its start has passed, or once the day closed.
+   */
+  async reopenMatch(actor: Actor, matchId: string, reason: string) {
+    const before = await this.requireMatch(this.db, matchId);
+    await this.mutateDay(
+      actor,
+      before.matchDayId,
+      'match.reopened',
+      async (tx, day) => {
+        if (day.status !== 'open') throw new DomainError('BAD_STATUS');
+        const match = await this.requireMatch(tx, matchId);
+        if (match.status !== 'scheduled' || match.actualStartAt) {
+          throw new DomainError('NOT_REOPENABLE');
+        }
+        const [result] = await tx
+          .select({ id: matchResults.id })
+          .from(matchResults)
+          .where(and(eq(matchResults.matchId, match.id), ne(matchResults.status, 'superseded')))
+          .limit(1);
+        if (result) throw new DomainError('NOT_REOPENABLE');
+        const relock = lockAt({ ...matchTiming(match), lockedAt: null }, dayTiming(day));
+        if (relock.getTime() <= Date.now()) throw new DomainError('NOT_REOPENABLE');
+        if (!match.lockedAt) return;
+        await tx.update(matches).set({ lockedAt: null }).where(eq(matches.id, match.id));
+        // Payments and picks made before the new lock now count for this match.
+        await this.bumpScoring(tx, day.id);
+      },
+      reason,
+      { matchId, lockedAt: before.lockedAt },
+    );
+    return this.get(before.matchDayId);
   }
 
   /** What stops a day from opening, in plain words. */

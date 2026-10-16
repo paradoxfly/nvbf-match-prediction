@@ -51,7 +51,7 @@ Answers 2 and 4 together would let someone predict, watch the first matches, and
   3. most exact scores
   4. most correct winners
   5. if still tied, players share the prize money of the places they occupy
-- **Locks:** each match locks at its scheduled start (minus optional lead minutes) or when the day closes, whichever is first. Admins can mark a match "started early". Once a lock has passed it never reopens.
+- **Locks:** each match locks at its scheduled start (minus optional lead minutes) or when the day closes, whichever is first. Admins can mark a match "started early". Once a lock has passed it stays locked, even if the match is rescheduled. The one exception: staff can reopen picks for a match that never started (e.g. postponed to later the same day) while the day is open, its new start is still ahead, it wasn't marked started and has no result. It needs a reason, is audited, and the match locks again at its new start.
 - **Who is eligible:** a confirmed payment, not disqualified, and at least one prediction that counts.
 - **Void matches:** void, postponed and abandoned matches don't count, and we use the league's official result (forfeits count as declared). If fewer than half of a day's matches are played, the day is cancelled and everyone gets a full refund.
 - **The pool never shrinks (PRD §8.4):**
