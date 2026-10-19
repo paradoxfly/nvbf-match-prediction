@@ -27,6 +27,7 @@ import { SponsorsStrip } from './sponsors-strip';
 function HomeSkeleton() {
   return (
     <div role="status" aria-label="Loading today's contest" className="flex flex-col gap-6">
+      <Skeleton className="h-24" />
       <Skeleton className="h-72 rounded-2xl bg-sg-night/90" />
       <Skeleton className="h-64" />
       <div className="grid gap-6 md:grid-cols-2">
@@ -66,6 +67,13 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
         {product.name}: {data.leagueName ?? 'daily volleyball predictions'}
       </h1>
 
+      <LeagueCalendar
+        days={data.days}
+        today={today}
+        focusDate={day?.date}
+        leagueName={data.leagueName}
+      />
+
       {day ? (
         <DayHero day={day} now={now} today={today} />
       ) : (
@@ -93,7 +101,7 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
               ) : undefined
             }
           />
-          <FixtureList matches={day.matches} now={now} picks={picks} />
+          <FixtureList matches={day.matches} now={now} dayStatus={day.status} picks={picks} />
         </section>
       ) : null}
 
@@ -103,13 +111,6 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
           {day ? <PrizeTable day={day} /> : null}
         </div>
       ) : null}
-
-      <LeagueCalendar
-        days={data.days}
-        today={today}
-        focusDate={day?.date}
-        leagueName={data.leagueName}
-      />
 
       {day ? <SponsorsStrip sponsors={day.sponsors} /> : null}
 
@@ -122,7 +123,7 @@ function HomeContent({ data, offset }: { data: HomeData; offset: number }) {
   );
 }
 
-/** Today's contest: the prize pool and fixtures first, then the jackpot, prizes and calendar. */
+/** Today's contest: the league calendar, the prize pool and fixtures, then the jackpot and prizes. */
 export function HomeScreen() {
   const home = useQuery(api.public.home.queryOptions({ refetchInterval: 15_000 }));
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { CATEGORY_LABELS, type Category } from '@predict/contracts';
+import { CATEGORY_LABELS, type Category, type DayStatus } from '@predict/contracts';
 import { Badge } from '@predict/ui/badge';
 import { cn } from '@predict/ui/utils';
-import { LockIcon } from 'lucide-react';
+import { ClockIcon, LockIcon } from 'lucide-react';
 import { majorLabel } from '@/components/play/pick-logic';
 import { TeamLogo } from '@/components/team-logo';
 import { formatScore, formatSets, formatTime } from '@/lib/format';
@@ -61,7 +61,15 @@ function TeamSide({ team, side, won }: { team: TeamData; side: 'home' | 'away'; 
   );
 }
 
-function MatchStatusTag({ match, now }: { match: MatchData; now: number }) {
+function MatchStatusTag({
+  match,
+  now,
+  dayStatus,
+}: {
+  match: MatchData;
+  now: number;
+  dayStatus: DayStatus;
+}) {
   if (match.status === 'void') {
     return (
       <Badge variant="destructive" title={match.voidReason ?? undefined}>
@@ -70,6 +78,15 @@ function MatchStatusTag({ match, now }: { match: MatchData; now: number }) {
     );
   }
   if (match.result) return <Badge variant="success">Final</Badge>;
+  // Picks for a day that hasn't opened aren't locked, just not open yet.
+  if (dayStatus === 'published') {
+    return (
+      <Badge>
+        <ClockIcon aria-hidden />
+        Opens soon
+      </Badge>
+    );
+  }
   if (isLocked(match, now)) {
     return (
       <Badge>
@@ -101,10 +118,12 @@ function YourPick({ match, pick }: { match: MatchData; pick: PredictionData }) {
 export function FixtureRow({
   match,
   now,
+  dayStatus,
   pick,
 }: {
   match: MatchData;
   now: number;
+  dayStatus: DayStatus;
   /** The signed-in player's saved pick for this match, if any. */
   pick?: PredictionData;
 }) {
@@ -123,7 +142,7 @@ export function FixtureRow({
             </span>
           ) : null}
         </div>
-        <MatchStatusTag match={match} now={now} />
+        <MatchStatusTag match={match} now={now} dayStatus={dayStatus} />
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 md:max-w-xl">
         <TeamSide
@@ -156,17 +175,25 @@ export function FixtureRow({
 export function FixtureList({
   matches,
   now,
+  dayStatus,
   picks,
 }: {
   matches: readonly MatchData[];
   now: number;
+  dayStatus: DayStatus;
   /** The signed-in player's saved picks, by match id. */
   picks?: ReadonlyMap<string, PredictionData>;
 }) {
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-lg bg-card shadow-card">
       {sortMatches(matches).map((match) => (
-        <FixtureRow key={match.id} match={match} now={now} pick={picks?.get(match.id)} />
+        <FixtureRow
+          key={match.id}
+          match={match}
+          now={now}
+          dayStatus={dayStatus}
+          pick={picks?.get(match.id)}
+        />
       ))}
     </ul>
   );
