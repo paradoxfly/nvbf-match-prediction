@@ -303,11 +303,12 @@ export class LeaguesService {
   }
 
   /**
-   * Sets the jackpot entry deadline. Once anyone has submitted a prediction the deadline is
-   * fixed: predictions can't be changed, so moving it would be unfair to those already in.
+   * Moves the jackpot entry deadline, earlier or later, until the jackpot is settled. Players
+   * already in can change their tables until it passes. A time that has already passed closes
+   * entries now; a later time reopens a closed jackpot.
    */
   async setJackpotClose(actor: Actor, id: string, date: string, time: string): Promise<LeagueView> {
-    const closesAt = watToUtc(date, time);
+    const requested = watToUtc(date, time);
     await this.db.transaction(async (tx) => {
       const [jackpot] = await tx
         .select()
@@ -318,14 +319,13 @@ export class LeaguesService {
       if (jackpot.status === 'settled' || jackpot.status === 'carried_over') {
         throw new DomainError('LEAGUE_LOCKED');
       }
-      const [entered] = await tx
-        .select({ n: count() })
-        .from(jackpotEntries)
-        .where(eq(jackpotEntries.jackpotId, jackpot.id));
-      if ((entered?.n ?? 0) > 0) throw new DomainError('JACKPOT_DEADLINE_FIXED');
+      // Never record a close before saves that already happened.
+      const now = new Date();
+      const open = requested > now;
+      const closesAt = open ? requested : now;
       await tx
         .update(jackpots)
-        .set({ entryClosesAt: closesAt, status: closesAt > new Date() ? 'open' : 'closed' })
+        .set({ entryClosesAt: closesAt, status: open ? 'open' : 'closed' })
         .where(eq(jackpots.id, jackpot.id));
       await this.audit.record(tx, actor, {
         action: 'jackpot.close_time_changed',

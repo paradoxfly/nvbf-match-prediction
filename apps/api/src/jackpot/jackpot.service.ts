@@ -14,6 +14,7 @@ import {
   isNull,
   isNotNull,
   jackpotEntries,
+  jackpotEntryRevisions,
   jackpots,
   leagues,
   leagueTeams,
@@ -110,15 +111,16 @@ export class JackpotService {
       orders: entry ? { men: entry.orders.men ?? [], women: entry.orders.women ?? [] } : null,
       submittedAt: entry?.submittedAt ?? null,
       eligible,
-      canSubmit: !entry && this.isOpen(jackpot, league),
+      canSubmit: this.isOpen(jackpot, league),
       position,
       distance,
     };
   }
 
   /**
-   * Submits the predicted tables, once. A submitted prediction can't be changed by anyone (a
-   * database trigger enforces it). Sending the identical order again (a retry) is harmless.
+   * Saves the predicted tables: the first save enters the jackpot, and a player can change them
+   * until entries close (a database trigger stops any later change). A change resets the saved
+   * time that breaks ties; sending the same tables again (a retry) keeps it.
    */
   async submit(userId: string, orders: JackpotOrders): Promise<MyJackpotView> {
     await enforceLimits(this.limits, [{ key: `jackpot:${userId}`, limit: 30, windowSec: MINUTE }]);
@@ -142,9 +144,17 @@ export class JackpotService {
     const rules = await this.publicService.rules();
 
     await this.db.transaction(async (tx) => {
+      // Shares the row lock with staff moving the deadline, so a save can't cross a close.
+      const [current] = await tx
+        .select()
+        .from(jackpots)
+        .where(eq(jackpots.id, jackpot.id))
+        .for('share');
       const clock = await tx.execute<{ now: Date }>(sql`select clock_timestamp() as now`);
       const now = new Date(clock.rows[0]!.now);
-      if (now >= jackpot.entryClosesAt) throw new DomainError('JACKPOT_CLOSED');
+      if (!current || current.status !== 'open' || now >= current.entryClosesAt) {
+        throw new DomainError('JACKPOT_CLOSED');
+      }
       const [created] = await tx
         .insert(jackpotEntries)
         .values({
@@ -156,14 +166,24 @@ export class JackpotService {
         })
         .onConflictDoNothing({ target: [jackpotEntries.jackpotId, jackpotEntries.userId] })
         .returning({ id: jackpotEntries.id });
-      if (created) return;
-      const [existing] = await tx
-        .select({ orders: jackpotEntries.orders })
-        .from(jackpotEntries)
-        .where(and(eq(jackpotEntries.jackpotId, jackpot.id), eq(jackpotEntries.userId, userId)));
-      if (!existing || !sameOrders(existing.orders, normalized)) {
-        throw new DomainError('ALREADY_SUBMITTED');
+      let entryId = created?.id;
+      if (!entryId) {
+        const [existing] = await tx
+          .select()
+          .from(jackpotEntries)
+          .where(and(eq(jackpotEntries.jackpotId, jackpot.id), eq(jackpotEntries.userId, userId)))
+          .for('update');
+        if (!existing) throw new DomainError('JACKPOT_CLOSED');
+        if (sameOrders(existing.orders, normalized)) return;
+        await tx
+          .update(jackpotEntries)
+          .set({ orders: normalized, submittedAt: now, rulesHash: rules.hash })
+          .where(eq(jackpotEntries.id, existing.id));
+        entryId = existing.id;
       }
+      await tx
+        .insert(jackpotEntryRevisions)
+        .values({ jackpotEntryId: entryId, orders: normalized, savedAt: now });
     });
     this.cache.invalidate('public:');
     return this.mine(userId);

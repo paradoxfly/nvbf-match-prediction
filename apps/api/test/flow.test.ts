@@ -3,6 +3,7 @@ import {
   entries,
   eq,
   jackpotEntries,
+  jackpotEntryRevisions,
   ledgerEntries,
   matches,
   payoutObligations,
@@ -514,7 +515,7 @@ describe('the league jackpot', () => {
     await t.reset();
   });
 
-  it('ranks predicted tables against the final standings; earliest submission wins a tie', async () => {
+  it('ranks predicted tables against the final standings; the earliest saved table wins a tie', async () => {
     const setup = await openContest(t);
     const [a, b, c, d] = setup.teamIds as [string, string, string, string];
     const finance = await adminClient(t, 'finance');
@@ -527,38 +528,50 @@ describe('the league jackpot', () => {
     expect(bad.body.code).toBe('BAD_ORDER');
     expect((await ada.get('/v1/me/jackpot').expect(200)).body.canSubmit).toBe(true);
 
-    // Ada and Bayo predict the same table; Ada submits first. Chidi is perfect but never pays.
-    await ada
-      .post('/v1/me/jackpot')
-      .send({ orders: { men: [b, a, c, d], women: [] } })
-      .expect(200);
+    // Ada and Bayo end up with the same table; Ada saves hers first. Chidi is perfect but never pays.
+    const saveAda = (men: string[]) =>
+      ada
+        .post('/v1/me/jackpot')
+        .send({ orders: { men, women: [] } })
+        .expect(200);
+    await saveAda([a, b, c, d]);
     const first = await ada.get('/v1/me/jackpot').expect(200);
-    expect(first.body).toMatchObject({ canSubmit: false, orders: { men: [b, a, c, d] } });
+    expect(first.body).toMatchObject({ canSubmit: true, orders: { men: [a, b, c, d] } });
 
-    // A retry of the same prediction is harmless; a different one is refused.
-    await ada
-      .post('/v1/me/jackpot')
-      .send({ orders: { men: [b, a, c, d], women: [] } })
-      .expect(200);
-    const change = await ada
-      .post('/v1/me/jackpot')
-      .send({ orders: { men: [a, b, c, d], women: [] } });
-    expect(change.body.code).toBe('ALREADY_SUBMITTED');
-    const after = await ada.get('/v1/me/jackpot').expect(200);
-    expect(after.body.submittedAt).toBe(first.body.submittedAt);
-    expect(after.body.orders.men).toEqual([b, a, c, d]);
+    // A retry of the same tables keeps the saved time; a change replaces them and resets it.
+    await saveAda([a, b, c, d]);
+    expect((await ada.get('/v1/me/jackpot').expect(200)).body.submittedAt).toBe(
+      first.body.submittedAt,
+    );
+    await saveAda([b, a, c, d]);
+    const changed = await ada.get('/v1/me/jackpot').expect(200);
+    expect(changed.body).toMatchObject({ canSubmit: true, orders: { men: [b, a, c, d] } });
+    expect(Date.parse(changed.body.submittedAt)).toBeGreaterThan(
+      Date.parse(first.body.submittedAt),
+    );
+    const history = await t.db.select().from(jackpotEntryRevisions);
+    expect(
+      history
+        .sort((x, y) => x.savedAt.getTime() - y.savedAt.getTime())
+        .map((revision) => revision.orders.men),
+    ).toEqual([
+      [a, b, c, d],
+      [b, a, c, d],
+    ]);
 
-    // Not even a direct database write can change or remove a submitted prediction.
+    // Entries are never deleted, and their history is append-only.
     const reason = (error: unknown) => {
       const failure = error as { message?: string; cause?: { message?: string } };
       return `${failure.message} ${failure.cause?.message ?? ''}`;
     };
-    expect(
-      await t.db.execute(sql`update jackpot_entries set orders = '{}'::jsonb`).catch(reason),
-    ).toMatch(/append-only/);
     expect(await t.db.execute(sql`delete from jackpot_entries`).catch(reason)).toMatch(
-      /append-only/,
+      /never deleted/,
     );
+    expect(
+      await t.db
+        .execute(sql`update jackpot_entry_revisions set orders = '{}'::jsonb`)
+        .catch(reason),
+    ).toMatch(/append-only/);
 
     await bayo
       .post('/v1/me/jackpot')
@@ -599,6 +612,15 @@ describe('the league jackpot', () => {
     await t.db.execute(
       sql`update jackpots set entry_closes_at = now() - interval '1 minute', status = 'closed'`,
     );
+    // Once closed, nobody can change a table: not the player, not a direct database write.
+    expect(
+      (await ada.post('/v1/me/jackpot').send({ orders: { men: [a, b, c, d], women: [] } })).body
+        .code,
+    ).toBe('JACKPOT_CLOSED');
+    expect((await ada.get('/v1/me/jackpot').expect(200)).body.canSubmit).toBe(false);
+    expect(
+      await t.db.execute(sql`update jackpot_entries set orders = '{}'::jsonb`).catch(reason),
+    ).toMatch(/entries are closed/);
     const blocked = await setup.admin
       .post(`/v1/admin/leagues/${setup.leagueId}/jackpot/settle`)
       .send({});

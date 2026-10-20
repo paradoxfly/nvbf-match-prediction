@@ -40,11 +40,28 @@ export function initialOrders(tables: Tables, saved: MyJackpotData['orders']): O
 
 const idsOf = (teams: readonly TeamData[] | undefined) => (teams ?? []).map((team) => team.id);
 
-/** Drag both tables into the order you think they'll finish, then submit (once, for good). */
-export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpotData }) {
+/**
+ * Drag both tables into the order you think they'll finish, then save. With tables already saved
+ * this changes them (until entries close), which resets the saved time that breaks ties.
+ */
+export function JackpotEditor({
+  tables,
+  mine,
+  onDone,
+}: {
+  tables: Tables;
+  mine: MyJackpotData;
+  /** Back to the saved tables: after saving a change, or on cancel. */
+  onDone?: () => void;
+}) {
   const queryClient = useQueryClient();
   const [orders, setOrders] = useState<Orders>(() => initialOrders(tables, mine.orders));
   const [confirming, setConfirming] = useState(false);
+  const changing = mine.orders !== null;
+  const saved = initialOrders(tables, mine.orders);
+  const edited = (['men', 'women'] as const).some(
+    (category) => idsOf(orders[category]).join() !== idsOf(saved[category]).join(),
+  );
 
   const submit = useMutation(
     api.jackpot.submit.mutationOptions({
@@ -52,6 +69,7 @@ export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpo
         setConfirming(false);
         queryClient.setQueryData(api.jackpot.mine.queryKey(), updated);
         void queryClient.invalidateQueries({ queryKey: api.jackpot.key() });
+        onDone?.();
       },
     }),
   );
@@ -60,10 +78,12 @@ export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpo
     <Card className="gap-5">
       <div className="flex flex-col gap-1">
         <Kicker>your prediction</Kicker>
-        <h2 className="text-xl leading-tight font-extrabold tracking-[-0.5px]">the final tables</h2>
+        <h2 className="text-xl leading-tight font-extrabold tracking-[-0.5px]">
+          {changing ? 'change your tables' : 'the final tables'}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Drag teams by the handle, or use the arrows. 1st is the top of the table. You can submit
-          once, and it can&apos;t be changed afterwards.
+          Drag teams by the handle, or use the arrows. 1st is the top of the table. You can change
+          your prediction until entries close.
         </p>
       </div>
 
@@ -83,9 +103,21 @@ export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpo
         ))}
       </div>
 
-      <Button size="lg" className="w-fit" onClick={() => setConfirming(true)}>
-        Submit my prediction
-      </Button>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          size="lg"
+          className="w-fit"
+          disabled={changing && !edited}
+          onClick={() => setConfirming(true)}
+        >
+          {changing ? 'Save changes' : 'Submit my prediction'}
+        </Button>
+        {changing && onDone ? (
+          <Button size="lg" variant="outline" className="w-fit" onClick={onDone}>
+            Cancel
+          </Button>
+        ) : null}
+      </div>
 
       <Dialog
         open={confirming}
@@ -94,9 +126,13 @@ export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpo
         }}
       >
         <DialogContent>
-          <DialogTitle>Submit your prediction?</DialogTitle>
+          <DialogTitle>
+            {changing ? 'Save your new tables?' : 'Submit your prediction?'}
+          </DialogTitle>
           <DialogDescription>
-            Once you submit, your tables are final. Nobody can change them, not you and not us.
+            {changing
+              ? 'This replaces your saved tables, and your saved time becomes now. If players end up equally close, whoever saved first wins.'
+              : 'You can change it until entries close. If players end up equally close, whoever saved their final tables first wins, so a later change resets your time.'}
           </DialogDescription>
           {submit.isError ? (
             <Alert variant="destructive">{errorMessage(submit.error)}</Alert>
@@ -115,7 +151,7 @@ export function JackpotEditor({ tables, mine }: { tables: Tables; mine: MyJackpo
                 })
               }
             >
-              {submit.isPending ? 'Submitting…' : 'Submit'}
+              {submit.isPending ? 'Saving…' : changing ? 'Save changes' : 'Submit'}
             </Button>
           </div>
         </DialogContent>

@@ -459,12 +459,13 @@ function jackpot(input: RulesInput): RulesSection {
   }
   paragraphs.push(
     `Predict the final men's and women's league tables before ${closes}.`,
-    "You can submit your prediction once. After you submit it, it can't be changed by you or " +
-      'by us, so check it carefully first.',
+    'You can change your prediction as often as you like until entries close. After that, it ' +
+      "can't be changed by you or by us.",
     'For each team, we count how many places you were off. For example, if you put a team 2nd ' +
       'and it finishes 5th, you were 3 places off. We add this up for every team in both tables.',
     'The lowest total wins the whole jackpot.',
-    'If two or more players are equally close, whoever submitted their prediction first wins.',
+    'If two or more players are equally close, whoever saved their final prediction first wins. ' +
+      'Changing your prediction resets that time.',
     "Teams that withdraw from the league are left out. Any team you didn't place is added to " +
       'the bottom of your table, in alphabetical order.',
     'To win, you need at least one paid, confirmed daily entry in this league.',

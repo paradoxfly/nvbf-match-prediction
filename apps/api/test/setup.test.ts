@@ -152,25 +152,36 @@ describe('contest setup (teams, leagues, days, fixtures)', () => {
     expect(view.body.teams).toHaveLength(4);
   });
 
-  it('fixes the jackpot deadline once anyone has submitted a prediction', async () => {
-    const { admin, leagueId } = await openContest(t);
-    // Before anyone enters, staff can still move it.
-    await admin
-      .put(`/v1/admin/leagues/${leagueId}/jackpot-close`)
-      .send({ date: watDay(4), time: '10:00' })
-      .expect(200);
+  it('moves the jackpot deadline either way after players enter, and closes or reopens it', async () => {
+    const { admin, leagueId, teamIds } = await openContest(t);
+    const player = await t.player();
+    const save = (men: string[]) =>
+      player.post('/v1/me/jackpot').send({ orders: { men, women: [] } });
+    await save(teamIds).expect(200);
 
-    await t.player();
-    await t.db.execute(sql`
-      insert into jackpot_entries (id, jackpot_id, user_id, orders, submitted_at, rules_hash)
-      select gen_random_uuid(), j.id, u.id, '{}'::jsonb, now(), 'x' from jackpots j, users u
-    `);
-    for (const date of [watDay(1), watDay(5)]) {
-      const res = await admin
+    const setClose = (date: string) =>
+      admin
         .put(`/v1/admin/leagues/${leagueId}/jackpot-close`)
-        .send({ date, time: '10:00' });
-      expect(res.body.code).toBe('JACKPOT_DEADLINE_FIXED');
+        .send({ date, time: '10:00' })
+        .expect(200);
+    // Later, then earlier: both fine with an entry in (10:00 Lagos is 09:00 UTC).
+    for (const date of [watDay(6), watDay(2)]) {
+      const res = await setClose(date);
+      expect(res.body.jackpot).toMatchObject({
+        status: 'open',
+        entryClosesAt: `${date}T09:00:00.000Z`,
+      });
     }
+
+    // A time that has passed closes entries now (never before saves already made).
+    const closed = await setClose(watDay(-1));
+    expect(closed.body.jackpot.status).toBe('closed');
+    expect(Date.parse(closed.body.jackpot.entryClosesAt)).toBeGreaterThan(Date.now() - 60_000);
+    expect((await save([...teamIds].reverse())).body.code).toBe('JACKPOT_CLOSED');
+
+    // A later time reopens them, and the player can change their tables again.
+    expect((await setClose(watDay(3))).body.jackpot.status).toBe('open');
+    await save([...teamIds].reverse()).expect(200);
   });
 
   it('enforces roles', async () => {

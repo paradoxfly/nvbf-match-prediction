@@ -76,11 +76,11 @@ export type JackpotView = z.infer<typeof JackpotView>;
 
 export const MyJackpotView = z.object({
   orders: JackpotOrders.nullable(),
-  /** When the prediction was submitted (earlier wins ties). It can't be changed afterwards. */
+  /** When these tables were saved; each change resets it (earlier wins ties). */
   submittedAt: z.date().nullable(),
   /** Has at least one confirmed, paid daily entry in this league. */
   eligible: z.boolean(),
-  /** True while entries are open and this player hasn't submitted yet. */
+  /** True while entries are open: the player can enter, or change the tables they saved. */
   canSubmit: z.boolean(),
   /** Own position and distance once entries have closed. */
   position: z.number().int().nullable(),
@@ -100,18 +100,14 @@ export const jackpotContract = {
     .output(MyJackpotView),
 
   /**
-   * Submits the predicted final tables, once: a submitted prediction can't be changed. Sending
-   * the identical order again (a retry) returns the existing entry.
+   * Saves the predicted final tables: enters the jackpot, or changes the tables until entries
+   * close. A change resets the saved time; sending the same tables again (a retry) keeps it.
    */
   submit: oc
     .route({ method: 'POST', path: '/me/jackpot', tags: ['jackpot'] })
     .errors({
       NO_JACKPOT: { status: 404, message: 'There is no jackpot running.' },
       JACKPOT_CLOSED: { status: 409, message: 'Jackpot predictions have closed.' },
-      ALREADY_SUBMITTED: {
-        status: 409,
-        message: "You've already submitted your prediction, and it can't be changed.",
-      },
       BAD_ORDER: {
         status: 400,
         message: 'Put every team in each table exactly once.',

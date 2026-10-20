@@ -168,12 +168,29 @@ export const jackpotEntries = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
     orders: jsonb().$type<StandingsOrders>().notNull(),
-    /** When it was submitted. Entries can't be changed afterwards (DB trigger); earlier wins ties. */
+    /**
+     * When these tables were saved: each change resets it, and earlier wins ties. A DB trigger
+     * stops any change (by anyone) once entries close, and any delete.
+     */
     submittedAt: tstz().notNull(),
     rulesHash: text().notNull(),
     ...timestamps,
   },
   (t) => [unique().on(t.jackpotId, t.userId)],
+);
+
+/** Every version of a player's jackpot tables, as saved (append-only). */
+export const jackpotEntryRevisions = pgTable(
+  'jackpot_entry_revisions',
+  {
+    id: id(),
+    jackpotEntryId: uuid()
+      .notNull()
+      .references(() => jackpotEntries.id, { onDelete: 'cascade' }),
+    orders: jsonb().$type<StandingsOrders>().notNull(),
+    savedAt: tstz().notNull(),
+  },
+  (t) => [index().on(t.jackpotEntryId, t.savedAt)],
 );
 
 export type EntryRow = typeof entries.$inferSelect;

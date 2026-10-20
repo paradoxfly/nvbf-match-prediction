@@ -1,5 +1,6 @@
 'use client';
 
+import { watDate, watTime } from '@predict/domain';
 import { Button } from '@predict/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@predict/ui/card';
 import { Dialog, DialogContent, DialogTrigger } from '@predict/ui/dialog';
@@ -278,7 +279,16 @@ function JackpotCard({ league }: { league: League }) {
           data,
         );
         void invalidate(queryClient, api.admin.jackpot.key());
-        toast({ title: 'Jackpot close time saved' });
+        // The server may adjust the time (a past one closes entries now): show what it kept.
+        const saved = toWatInputs(data.jackpot?.entryClosesAt);
+        setDate(saved.date);
+        setTime(saved.time);
+        toast({
+          title:
+            data.jackpot?.status === 'closed'
+              ? 'Jackpot entries closed'
+              : 'Jackpot close time saved',
+        });
       },
     }),
   );
@@ -294,10 +304,8 @@ function JackpotCard({ league }: { league: League }) {
     );
   }
 
-  // The deadline is fixed once anyone has submitted (predictions can't change, so neither can it).
-  const fixed = jackpot.entries > 0;
-  const editable =
-    can(admin) && !fixed && jackpot.status !== 'settled' && jackpot.status !== 'carried_over';
+  // Movable either way until settlement; players can change their tables until it passes.
+  const editable = can(admin) && jackpot.status !== 'settled' && jackpot.status !== 'carried_over';
   const changed = date !== initial.date || time !== initial.time;
 
   return (
@@ -328,22 +336,41 @@ function JackpotCard({ league }: { league: League }) {
             time={time}
             onDateChange={setDate}
             onTimeChange={setTime}
-            hint="Choose carefully: once the first player submits a prediction, this deadline is fixed."
+            hint="Players can enter and change their tables until this time. Move it earlier or later; a later time reopens closed entries."
           />
           <ErrorAlert error={setClose.error} />
-          <Button
-            type="submit"
-            variant="outline"
-            className="w-fit"
-            disabled={!date || !time || !changed || setClose.isPending}
-          >
-            {setClose.isPending ? 'Saving…' : 'Save close time'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-fit"
+              disabled={!date || !time || !changed || setClose.isPending}
+            >
+              {setClose.isPending ? 'Saving…' : 'Save close time'}
+            </Button>
+            {jackpot.status === 'open' ? (
+              <ConfirmAction
+                trigger={
+                  <Button type="button" variant="ghost" className="w-fit">
+                    Close entries now
+                  </Button>
+                }
+                title="Close jackpot entries now?"
+                description="Players can't enter or change their tables after this. You can reopen entries later by setting a new close time."
+                confirmLabel="Close entries"
+                pendingLabel="Closing…"
+                onConfirm={() => {
+                  const now = new Date();
+                  return setClose.mutateAsync({
+                    id: league.id,
+                    date: watDate(now),
+                    time: watTime(now),
+                  });
+                }}
+              />
+            ) : null}
+          </div>
         </form>
-      ) : fixed && jackpot.status === 'open' ? (
-        <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-          The deadline is fixed: players have already submitted predictions.
-        </p>
       ) : null}
     </Card>
   );

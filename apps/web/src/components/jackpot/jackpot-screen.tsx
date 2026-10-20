@@ -10,6 +10,7 @@ import { cn } from '@predict/ui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { ClockIcon, GemIcon, TrophyIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 import { QueryError } from '@/components/query-error';
 import { useOptionalSession } from '@/components/session';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,8 +111,8 @@ function HowItWorks() {
   const points = [
     "Predict the final men's and women's league tables.",
     'For each team, we count how many places you are off, and add them up. The lowest total wins the whole jackpot.',
-    'You submit once. After that, nobody can change your prediction, so check it carefully.',
-    'Equal totals: whoever submitted first wins.',
+    'You can change your prediction until entries close. After that, nobody can change it.',
+    'Equal totals: whoever saved their final tables first wins. Changing them resets your time.',
     'To win, you need at least one paid, confirmed daily entry in this league.',
   ];
   return (
@@ -151,14 +152,24 @@ function EntryStatusLine({ mine }: { mine: MyJackpotData }) {
       )}
       {mine.submittedAt ? (
         <span className="text-muted-foreground">
-          Submitted {formatMoment(mine.submittedAt)}. It can&apos;t be changed.
+          Saved {formatMoment(mine.submittedAt)}.
+          {mine.canSubmit ? ' You can change it until entries close.' : ''}
         </span>
       ) : null}
     </div>
   );
 }
 
-function MyPrediction({ data, mine }: { data: JackpotData; mine: MyJackpotData }) {
+function MyPrediction({
+  data,
+  mine,
+  onChange,
+}: {
+  data: JackpotData;
+  mine: MyJackpotData;
+  /** Set while entries are open: switches to the editor. */
+  onChange?: () => void;
+}) {
   if (!mine.orders) {
     return (
       <Card>
@@ -182,6 +193,11 @@ function MyPrediction({ data, mine }: { data: JackpotData; mine: MyJackpotData }
           </p>
         ) : null}
       </div>
+      {onChange ? (
+        <Button variant="outline" className="w-fit" onClick={onChange}>
+          Change my prediction
+        </Button>
+      ) : null}
       <div className="grid gap-6 md:grid-cols-2">
         {data.tables.map((table) => (
           <section key={table.category} className="flex flex-col gap-3">
@@ -245,7 +261,7 @@ function Ranking({ data }: { data: JackpotData }) {
         </Card>
       )}
       <p className="text-xs text-muted-foreground">
-        Lower is better. Equal totals are ordered by who submitted first.
+        Lower is better. Equal totals are ordered by who saved their tables first.
       </p>
     </section>
   );
@@ -260,6 +276,7 @@ function PlayerSection({ data, offset }: { data: JackpotData; offset: number }) 
     enabled: Boolean(user),
     retry: false,
   });
+  const [changing, setChanging] = useState(false);
   const open =
     data.jackpot.status === 'open' && new Date(data.jackpot.entryClosesAt).getTime() > now;
 
@@ -296,10 +313,14 @@ function PlayerSection({ data, offset }: { data: JackpotData; offset: number }) 
   return (
     <div className="flex flex-col gap-4">
       <EntryStatusLine mine={mine.data} />
-      {editable ? (
-        <JackpotEditor tables={data.tables} mine={mine.data} />
+      {editable && (!mine.data.orders || changing) ? (
+        <JackpotEditor tables={data.tables} mine={mine.data} onDone={() => setChanging(false)} />
       ) : (
-        <MyPrediction data={data} mine={mine.data} />
+        <MyPrediction
+          data={data}
+          mine={mine.data}
+          onChange={editable ? () => setChanging(true) : undefined}
+        />
       )}
     </div>
   );

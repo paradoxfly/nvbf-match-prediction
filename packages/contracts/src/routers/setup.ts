@@ -139,10 +139,6 @@ const LEAGUE_ERRORS = {
     status: 409,
     message: 'Add at least two teams in a category before starting the league.',
   },
-  JACKPOT_DEADLINE_FIXED: {
-    status: 409,
-    message: 'Players have already submitted jackpot predictions, so the deadline is fixed.',
-  },
   DATE_OUTSIDE_LEAGUE: { status: 400, message: 'Match-days must fall within the league dates.' },
 } as const;
 
@@ -180,6 +176,10 @@ export const adminLeaguesContract = {
     .input(IdParam)
     .output(LeagueView),
 
+  /**
+   * Moves the jackpot entry deadline, earlier or later, until settlement. A time that has passed
+   * closes entries now; a later one reopens them.
+   */
   setJackpotClose: oc
     .route({ method: 'PUT', path: '/admin/leagues/{id}/jackpot-close', tags: ['admin-leagues'] })
     .errors(LEAGUE_ERRORS)

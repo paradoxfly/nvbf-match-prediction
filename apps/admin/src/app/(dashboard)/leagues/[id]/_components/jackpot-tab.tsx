@@ -110,7 +110,7 @@ export function JackpotTab({ league }: { league: League }) {
                       <TableHead>Place</TableHead>
                       <TableHead>Player</TableHead>
                       <TableHead className="text-right">Distance</TableHead>
-                      <TableHead>Submitted</TableHead>
+                      <TableHead>Last saved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

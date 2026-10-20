@@ -27,9 +27,9 @@ The PRD (`daily_volleyball_prediction_contest_prd.md`) is the base. Where this f
 4. **Picks before payment:** players can pick before their payment is confirmed. Picks show as "not valid yet" until it is.
 5. **Who can win the jackpot:** anyone signed in can submit standings, but only players with at least one confirmed, paid daily entry in that league can win.
 6. **How the jackpot is won:** the closest prediction wins. For each team, count how many places off the prediction is, across both tables. The lowest total wins, and a perfect prediction scores 0.
-7. **Jackpot ties:** among players equally close, the one who submitted first wins.
-8. **Jackpot predictions are final once submitted** (owner, 13 Oct 2026): each player submits once, and nobody can change it afterwards, staff included. A database trigger enforces this.
-9. **Fixed jackpot deadline** (owner, 13 Oct 2026): staff set the deadline when creating the league. They can change it only until the first prediction is submitted; after that it is fixed, because moving it would be unfair to players who can no longer change their prediction.
+7. **Jackpot ties:** among players equally close, the one who saved their final tables first wins.
+8. **Jackpot predictions can change until entries close** (owner, 20 Oct 2026; replaces "final once submitted" from 13 Oct): a player can change their tables as often as they like until entries close. After that nobody can change them, staff included, and entries are never deleted. A database trigger enforces this, and every saved version is kept. Each change resets the player's saved time, which is what breaks ties (7), so a late change can't keep an early time.
+9. **Movable jackpot deadline** (owner, 20 Oct 2026; replaces the fixed deadline from 13 Oct): staff set the deadline when creating the league and can move it earlier or later until the jackpot is settled, since players can still change their tables until it passes. A time that has already passed closes entries now, and staff can close them early. A later time reopens closed entries.
 10. **Corrected bank details** (owner, 14 Oct 2026): when staff mark a payout's bank details invalid, the player's correction is used straight away instead of after the usual 24-hour wait, since the old account is known not to work. The payout returns to Ready with a note asking finance to compare the bank's name check with the old account name. The player is still emailed about the change.
 
 ## Fairness rule (design review)

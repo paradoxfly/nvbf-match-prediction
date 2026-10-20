@@ -297,9 +297,10 @@ describe('buildRules', () => {
   ])('jackpot entries close $expected', ({ closesAt, expected }) => {
     const text = textOf(rules({ jackpotEntryClosesAt: closesAt }), 'jackpot');
     expect(text).toContain(expected);
-    expect(text).toContain('You can submit your prediction once');
+    expect(text).toContain('You can change your prediction as often as you like');
     expect(text).toContain("it can't be changed by you or by us");
-    expect(text).toContain('whoever submitted their prediction first wins');
+    expect(text).toContain('whoever saved their final prediction first wins');
+    expect(text).toContain('Changing your prediction resets that time.');
     expect(text).toContain('carries over to the next league');
     expect(text).toContain('Your total for this table: 4.');
   });
